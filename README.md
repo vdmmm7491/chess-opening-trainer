@@ -11,6 +11,8 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
 - **Stockfish evaluation bar**: Stockfish 10 runs in your browser in a Web Worker. The best engine line is hidden while you practise so it doesn't give away the answer.
 - **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list.
+- **Board you can draw on**: right-click and drag to draw arrows (knight moves get L-shaped arrows), right-click a square to highlight it. Hold Shift, Ctrl or Alt for green, red or blue. Left-click clears them.
+- **Appearance settings** (⚙ in the top bar): 6 piece sets, 6 board colours, dark or light theme.
 - **Progress tracking**: streak, activity heatmap, mastery per opening and line, recent sessions. Export/import moves your progress between devices.
 - **Chess.com review**: enter a username to download public games through Chess.com's public API (no login needed). You get:
   - win/draw/loss by opening, as White and as Black
@@ -81,7 +83,8 @@ Tip: end each line on **your** move, so the line finishes on something you playe
 
 - Engine: [Stockfish](https://stockfishchess.org) (GPL-3.0), via the `stockfish.js` 10.0.2 build by nmrugg
 - Move logic: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2), loaded from jsDelivr
-- Piece set: cburnett, from [lichess](https://github.com/lichess-org/lila) (GPL)
+- Piece sets, loaded from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md):
+  Staunty, Maestro and Cardinal by sadsnake1 (CC BY-NC-SA 4.0); Merida and cburnett (GPLv2+); Governor
 - Game data: [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api)
 
 This project is licensed under **GPL-3.0** (see `LICENSE`) because it ships Stockfish.

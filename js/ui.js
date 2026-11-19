@@ -123,7 +123,7 @@ export function makeAnalyser(engine, bar, lineEl, board) {
           bar.set(info);
           if (lineEl) lineEl.textContent = `${formatEval(info)}  d${info.depth}  ${pvToSan(fen, info.pv, 8)}`;
           if (board && showArrow && info.pv[0]) {
-            board.setArrows([{ from: info.pv[0].slice(0, 2), to: info.pv[0].slice(2, 4), color: 'rgba(76,141,255,0.75)' }]);
+            board.setArrows([{ from: info.pv[0].slice(0, 2), to: info.pv[0].slice(2, 4), color: 'blue' }]);
           }
         },
       });

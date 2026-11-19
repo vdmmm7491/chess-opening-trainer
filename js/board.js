@@ -1,15 +1,25 @@
-// Lightweight, dependency-free chessboard with tap-to-move and drag-and-drop
-// (pointer events, so it works with mouse, touch and pen).
+// Lightweight, dependency-free chessboard.
+// - Left button / touch: tap-to-move or drag-and-drop (pointer events)
+// - Right-click drag: draw arrows; right-click a square: highlight it (Shift/Ctrl/Alt = other colours)
+// - Left-click anywhere clears drawn arrows and highlights
+import { pieceSet } from './theme.js';
 
-const PIECE_BASE = 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/cburnett/';
+const PIECE_BASE = 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/';
 const FILES = 'abcdefgh';
 
-export function pieceUrl(color, type) {
-  return `${PIECE_BASE}${color}${type.toUpperCase()}.svg`;
+// Arrow / highlight palette (similar to what players are used to on big chess sites)
+export const ARROW_COLORS = { orange: '#ffaa00', green: '#9fcf3f', red: '#f2543d', blue: '#48b4f0' };
+const MARK_COLORS = { orange: '#ffaa00', green: '#acce59', red: '#eb6150', blue: '#52b0dc' };
+
+export function pieceUrl(color, type, set = pieceSet()) {
+  return `${PIECE_BASE}${set}/${color}${type.toUpperCase()}.svg`;
 }
 
-// Preload piece images so the first render does not flicker.
-for (const c of 'wb') for (const t of 'pnbrqk') { const i = new Image(); i.src = pieceUrl(c, t); }
+function preload() {
+  for (const c of 'wb') for (const t of 'pnbrqk') { const i = new Image(); i.src = pieceUrl(c, t); }
+}
+preload();
+window.addEventListener('pieceset', preload);
 
 function parseFen(fen) {
   const map = {};
@@ -24,6 +34,13 @@ function parseFen(fen) {
     }
   });
   return map;
+}
+
+function modifierColor(e) {
+  if (e.shiftKey) return 'green';
+  if (e.ctrlKey || e.metaKey) return 'red';
+  if (e.altKey) return 'blue';
+  return 'orange';
 }
 
 export class Board {
@@ -42,8 +59,12 @@ export class Board {
     this.lastMove = null;
     this.checkSq = null;
     this.selected = null;
-    this.arrows = [];
+    this.arrows = [];      // arrows set by the app (hints, engine)
+    this.userArrows = [];  // arrows drawn by the user
+    this.marks = {};       // square -> colour key, drawn by the user
+    this.preview = null;   // arrow being drawn
     this.drag = null;
+    this.rdrag = null;
     this.build();
     this.bind();
   }
@@ -70,6 +91,7 @@ export class Board {
     this.el.appendChild(this.svg);
     this.renderPieces();
     this.renderHighlights();
+    this.renderMarks();
     this.renderArrows();
   }
 
@@ -90,7 +112,16 @@ export class Board {
 
   flip() { this.setOrientation(this.orientation === 'w' ? 'b' : 'w'); }
 
+  /** App-controlled arrows: [{from, to, color?: 'green'|'blue'|'orange'|'red'|css}] */
   setArrows(arrows) { this.arrows = arrows || []; this.renderArrows(); }
+
+  clearDrawings() {
+    if (!this.userArrows.length && !Object.keys(this.marks).length) return;
+    this.userArrows = [];
+    this.marks = {};
+    this.renderMarks();
+    this.renderArrows();
+  }
 
   flash() {
     const f = document.createElement('div');
@@ -121,6 +152,19 @@ export class Board {
     }
   }
 
+  renderMarks() {
+    for (const [sq, div] of Object.entries(this.squares)) {
+      div.querySelector('.mark')?.remove();
+      const c = this.marks[sq];
+      if (c) {
+        const m = document.createElement('div');
+        m.className = 'mark';
+        m.style.background = MARK_COLORS[c] || c;
+        div.appendChild(m);
+      }
+    }
+  }
+
   sqCenter(sq) {
     const f = FILES.indexOf(sq[0]), r = Number(sq[1]);
     const x = this.orientation === 'w' ? f : 7 - f;
@@ -128,30 +172,44 @@ export class Board {
     return [x + 0.5, y + 0.5];
   }
 
+  /** Build the SVG for one arrow. Knight moves get an L-shaped arrow. */
+  arrowSvg(a, opacity = 0.8) {
+    const color = ARROW_COLORS[a.color] || a.color || ARROW_COLORS.green;
+    const [x1, y1] = this.sqCenter(a.from);
+    const [x2, y2] = this.sqCenter(a.to);
+    const dx = x2 - x1, dy = y2 - y1;
+    const W = 0.2, HW = 0.52, HL = 0.42; // shaft width, head width, head length (in squares)
+    const knight = (Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1);
+    const pts = knight
+      ? [[x1, y1], Math.abs(dx) > Math.abs(dy) ? [x2, y1] : [x1, y2], [x2, y2]]
+      : [[x1, y1], [x2, y2]];
+    // Start a little away from the centre of the origin square, like big chess sites do.
+    const [sx, sy] = pts[0], [nx0, ny0] = pts[1];
+    const l0 = Math.hypot(nx0 - sx, ny0 - sy);
+    const startOff = knight ? 0 : 0.25;
+    pts[0] = [sx + ((nx0 - sx) / l0) * startOff, sy + ((ny0 - sy) / l0) * startOff];
+    // Head: tip slightly past the centre of the target square.
+    const [px, py] = pts[pts.length - 2];
+    const len = Math.hypot(x2 - px, y2 - py);
+    const ux = (x2 - px) / len, uy = (y2 - py) / len;
+    const tip = [x2 + ux * 0.1, y2 + uy * 0.1];
+    const base = [tip[0] - ux * HL, tip[1] - uy * HL];
+    const nx = -uy, ny = ux;
+    const shaft = [...pts.slice(0, -1), base].map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(3)},${p[1].toFixed(3)}`).join(' ');
+    const head = [tip, [base[0] + nx * HW / 2, base[1] + ny * HW / 2], [base[0] - nx * HW / 2, base[1] - ny * HW / 2]]
+      .map((p) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`).join(' ');
+    // Grouping with a single opacity avoids darker overlaps where shaft and head meet.
+    return `<g opacity="${opacity}"><path d="${shaft}" fill="none" stroke="${color}" stroke-width="${W}" stroke-linejoin="miter" stroke-linecap="butt"/>` +
+      `<polygon points="${head}" fill="${color}"/></g>`;
+  }
+
   renderArrows() {
-    const ns = 'http://www.w3.org/2000/svg';
-    this.svg.innerHTML = '';
-    const defs = document.createElementNS(ns, 'defs');
-    this.svg.appendChild(defs);
-    this.arrows.forEach((a, i) => {
-      const color = a.color || 'rgba(21,120,27,0.8)';
-      const id = 'ah' + i;
-      defs.insertAdjacentHTML('beforeend',
-        `<marker id="${id}" markerWidth="4" markerHeight="4" refX="2.05" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="${color}"/></marker>`);
-      const [x1, y1] = this.sqCenter(a.from);
-      const [x2, y2] = this.sqCenter(a.to);
-      const len = Math.hypot(x2 - x1, y2 - y1);
-      const shorten = 0.35;
-      const ex = x2 - ((x2 - x1) / len) * shorten, ey = y2 - ((y2 - y1) / len) * shorten;
-      const line = document.createElementNS(ns, 'line');
-      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-      line.setAttribute('x2', ex); line.setAttribute('y2', ey);
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', '0.17');
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('marker-end', `url(#${id})`);
-      this.svg.appendChild(line);
-    });
+    const all = [
+      ...this.arrows.map((a) => this.arrowSvg(a, 0.75)),
+      ...this.userArrows.map((a) => this.arrowSvg(a, 0.8)),
+      ...(this.preview ? [this.arrowSvg(this.preview, 0.6)] : []),
+    ];
+    this.svg.innerHTML = all.join('');
   }
 
   squareAt(clientX, clientY) {
@@ -170,18 +228,45 @@ export class Board {
   }
 
   bind() {
+    const handlers = {
+      move: (e) => this.moveDrag(e),
+      up: (e) => this.up(e),
+      cancel: () => this.cancelDrag(),
+      pieces: () => this.renderPieces(),
+    };
+    // Window listeners outlive the board when the page changes, so they remove themselves.
+    const guard = (fn) => (e) => {
+      if (!this.el.isConnected) {
+        window.removeEventListener('pointermove', h.move);
+        window.removeEventListener('pointerup', h.up);
+        window.removeEventListener('pointercancel', h.cancel);
+        window.removeEventListener('pieceset', h.pieces);
+        return;
+      }
+      fn(e);
+    };
+    const h = Object.fromEntries(Object.entries(handlers).map(([k, fn]) => [k, guard(fn)]));
     this.el.addEventListener('pointerdown', (e) => this.down(e));
-    window.addEventListener('pointermove', (e) => this.moveDrag(e));
-    window.addEventListener('pointerup', (e) => this.up(e));
-    window.addEventListener('pointercancel', () => this.cancelDrag());
+    window.addEventListener('pointermove', h.move);
+    window.addEventListener('pointerup', h.up);
+    window.addEventListener('pointercancel', h.cancel);
+    window.addEventListener('pieceset', h.pieces);
     this.el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   down(e) {
-    if (e.button !== undefined && e.button !== 0) return;
     const sq = this.squareAt(e.clientX, e.clientY);
     if (!sq) return;
     e.preventDefault();
+
+    if (e.button === 2) {
+      this.cancelDrag();
+      this.rdrag = { from: sq, to: sq, color: modifierColor(e) };
+      return;
+    }
+    if (e.button !== undefined && e.button !== 0) return;
+    this.clearDrawings();
+
     if (this.selected && this.selected !== sq && this.getDests(this.selected).includes(sq)) {
       this.tryMove(this.selected, sq);
       return;
@@ -191,8 +276,7 @@ export class Board {
       this.selected = sq;
       this.renderHighlights();
       const pieceEl = this.squares[sq].querySelector('.piece');
-      const r = this.el.getBoundingClientRect();
-      this.drag = { from: sq, el: pieceEl, startX: e.clientX, startY: e.clientY, size: r.width / 8, moved: false, wasSelected };
+      this.drag = { from: sq, el: pieceEl, startX: e.clientX, startY: e.clientY, moved: false, wasSelected };
     } else {
       this.selected = null;
       this.renderHighlights();
@@ -200,6 +284,15 @@ export class Board {
   }
 
   moveDrag(e) {
+    if (this.rdrag) {
+      const sq = this.squareAt(e.clientX, e.clientY);
+      if (sq !== this.rdrag.to) {
+        this.rdrag.to = sq;
+        this.preview = sq && sq !== this.rdrag.from ? { from: this.rdrag.from, to: sq, color: this.rdrag.color } : null;
+        this.renderArrows();
+      }
+      return;
+    }
     if (!this.drag) return;
     const dx = e.clientX - this.drag.startX, dy = e.clientY - this.drag.startY;
     if (!this.drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -211,6 +304,23 @@ export class Board {
   }
 
   up(e) {
+    if (this.rdrag && e.button === 2) {
+      const { from, color } = this.rdrag;
+      const to = this.squareAt(e.clientX, e.clientY);
+      this.rdrag = null;
+      this.preview = null;
+      if (!to || to === from) {
+        if (this.marks[from] === color) delete this.marks[from]; else this.marks[from] = color;
+        this.renderMarks();
+      } else {
+        const i = this.userArrows.findIndex((a) => a.from === from && a.to === to);
+        if (i >= 0 && this.userArrows[i].color === color) this.userArrows.splice(i, 1);
+        else if (i >= 0) this.userArrows[i].color = color;
+        else this.userArrows.push({ from, to, color });
+      }
+      this.renderArrows();
+      return;
+    }
     if (!this.drag) return;
     const d = this.drag;
     this.drag = null;
@@ -226,6 +336,7 @@ export class Board {
   }
 
   cancelDrag() {
+    if (this.rdrag) { this.rdrag = null; this.preview = null; this.renderArrows(); }
     if (!this.drag) return;
     if (this.drag.el) { this.drag.el.classList.remove('dragging'); this.drag.el.style.transform = ''; }
     this.drag = null;

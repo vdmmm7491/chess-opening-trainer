@@ -4,6 +4,10 @@ import * as trainer from './views/trainer.js';
 import * as analysis from './views/analysis.js';
 import * as progress from './views/progress.js';
 import * as chesscom from './views/chesscom.js';
+import { applyTheme, openSettings } from './theme.js';
+
+applyTheme();
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
 const app = document.getElementById('app');
 let cleanup = null;

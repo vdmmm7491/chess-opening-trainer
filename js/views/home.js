@@ -1,6 +1,7 @@
 import { OPENINGS } from '../openings.js';
 import { mastery, dueCount, summary } from '../progress.js';
 import { h, esc } from '../ui.js';
+import { pieceUrl } from '../board.js';
 
 let filter = 'all';
 
@@ -30,7 +31,8 @@ export function render(root) {
       const m = Math.round(mastery(o) * 100);
       const due = dueCount(o);
       grid.appendChild(h(`<article class="card opening-card">
-        <div class="title"><h3>${esc(o.name)}</h3><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
+        <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
+          <h3>${esc(o.name)}</h3></div><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
         <p>${esc(o.description)}</p>
         <div class="kv"><span class="muted">${o.lines.length} lines · ${esc(o.eco)}</span><span>${m}% mastered</span></div>
         <div class="bar"><span style="width:${m}%"></span></div>
