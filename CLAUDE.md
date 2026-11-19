@@ -7,4 +7,5 @@
 - Progress lives in localStorage under `opening-trainer.v1` and is keyed by `openingId:lineIndex`. Never rename opening ids or reorder existing lines; add new lines at the end.
 - Every opening needs `levels` (keys of `LEVELS` in `js/openings.js`) and a one-sentence `levelNote`.
 - Validate after editing `js/openings.js` by opening `tools/validate.html` (legal SAN, unique ids, valid levels, lines end on the trainee's move).
+- Coach: `js/coach.js` has a rule-based `explainMove` (own attack/pin detection, no engine) and an engine-backed `analyseMistake` that compares two `searchmoves` searches from the same root. `js/notes.js` holds hand-written idea notes keyed by the full SAN move sequence. The validator checks the note keys.
 - Local test server: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1` (port 8080).

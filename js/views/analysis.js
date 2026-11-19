@@ -1,6 +1,7 @@
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
+import { explainMove, noteFor } from '../coach.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -24,6 +25,10 @@ export function render(root, { query }) {
       <div class="card">
         <h1 style="margin:0 0 6px">Analysis board</h1>
         <div class="muted book" style="font-size:.9rem;min-height:1.3em"></div>
+      </div>
+      <div class="card coach">
+        <div class="coach-head"><span class="coach-avatar">🎓</span><b>Coach</b></div>
+        <div class="coach-body"><p class="muted">Make a move and I'll explain what it does.</p></div>
       </div>
       <div class="card">
         <div class="engine-line"></div>
@@ -97,6 +102,23 @@ export function render(root, { query }) {
         : 'Not in the trainer\'s repertoire.';
     } else bookEl.textContent = startFen === START ? 'Make a move or load a position.' : 'Custom position';
     view.querySelectorAll('[data-ep]').forEach((b) => b.classList.toggle('primary', b.dataset.ep === (enginePlays || '')));
+    explainLast();
+  }
+
+  function explainLast() {
+    const body = $('.coach-body');
+    if (cursor === 0) { body.innerHTML = '<p class="muted">Make a move and I\'ll explain what it does.</p>'; return; }
+    const c = new Chess(startFen);
+    let prev = null;
+    for (const s of sans.slice(0, cursor - 1)) { const m = c.move(s); prev = { to: m.to, captured: m.captured }; }
+    const san = sans[cursor - 1];
+    const note = startFen === START ? noteFor(sans.slice(0, cursor)) : null;
+    const reasons = explainMove(c.fen(), san, { prev }, 3);
+    const ply = cursor - 1;
+    const label = `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
+    body.innerHTML = `<div class="coach-entry"><div class="coach-title">What <b>${esc(label)}</b> does</div>
+      ${note ? `<p class="coach-idea">💡 ${esc(note)}</p>` : ''}
+      <ul>${reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
   }
 
   async function maybeEngine() {
