@@ -42,7 +42,6 @@ export function render(root) {
     <button class="btn small" data-f="all">All</button>
     <button class="btn small" data-f="w">As White</button>
     <button class="btn small" data-f="b">As Black</button>
-    <button class="btn small" data-f="due">Due for review</button>
   </div>`);
   root.appendChild(filters);
   const heading = h('<h2 class="level-title"></h2>');
@@ -60,7 +59,7 @@ export function render(root) {
     grid.innerHTML = '';
     const list = OPENINGS.filter((o) =>
       (level === 'all' || (o.levels || []).includes(level)) &&
-      (sideFilter === 'all' || o.side === sideFilter || (sideFilter === 'due' && dueCount(o) > 0)));
+      (sideFilter === 'all' || o.side === sideFilter));
     for (const o of list) {
       const m = Math.round(mastery(o) * 100);
       const due = dueCount(o);
@@ -79,9 +78,7 @@ export function render(root) {
       </article>`));
     }
     if (!list.length) {
-      grid.appendChild(h(sideFilter === 'due'
-        ? '<p class="muted">Nothing due – great job! Come back tomorrow.</p>'
-        : '<p class="muted">No openings match these filters yet.</p>'));
+      grid.appendChild(h('<p class="muted">No openings match these filters yet.</p>'));
     }
   }
 
