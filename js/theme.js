@@ -6,7 +6,6 @@ export const PIECE_SETS = {
   maestro: 'Maestro',
   cardinal: 'Cardinal',
   merida: 'Merida',
-  governor: 'Governor',
   cburnett: 'Classic',
 };
 
@@ -57,7 +56,7 @@ export function openSettings() {
   const preview = () => {
     const set = dlg.querySelector('[name=pieceSet]').value;
     dlg.querySelector('.piece-preview').innerHTML = ['wK', 'wQ', 'wN', 'bK', 'bQ', 'bN']
-      .map((p, i) => `<span class="${i % 2 ? 'd' : 'l'}" style="background-image:url(https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/${set}/${p}.svg)"></span>`).join('');
+      .map((p, i) => `<span class="${i % 2 ? 'd' : 'l'}" style="background-image:url(assets/pieces/${set}/${p}.svg)"></span>`).join('');
   };
   dlg.addEventListener('change', (e) => {
     setSetting(e.target.name, e.target.value);

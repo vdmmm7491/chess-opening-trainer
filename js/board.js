@@ -4,7 +4,9 @@
 // - Left-click anywhere clears drawn arrows and highlights
 import { pieceSet } from './theme.js';
 
-const PIECE_BASE = 'https://cdn.jsdelivr.net/gh/lichess-org/lila@master/public/piece/';
+// Piece SVGs are shipped with the site (assets/pieces/<set>/), copied from lichess (see LICENSE.md there).
+// Loading them from a CDN was unreliable: pieces sometimes failed to appear.
+const PIECE_BASE = 'assets/pieces/';
 const FILES = 'abcdefgh';
 
 // Arrow / highlight palette (similar to what players are used to on big chess sites)
