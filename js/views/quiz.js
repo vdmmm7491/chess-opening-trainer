@@ -1,6 +1,6 @@
 // Quiz: random positions from one opening (move 3 onwards); find the book move.
 import { getOpening, lineMoves } from '../openings.js';
-import { recordQuiz, quizStats } from '../progress.js';
+import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { Board } from '../board.js';
 import { noteFor } from '../coach.js';
 import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from '../ui.js';
@@ -34,6 +34,20 @@ function shuffle(a) {
 export function render(root, { id }) {
   const opening = getOpening(id);
   if (!opening) { root.appendChild(h('<p>Opening not found. <a href="#/">Back</a></p>')); return; }
+  if (!quizUnlocked(opening)) {
+    const done = linesLearned(opening);
+    root.appendChild(h(`<section class="card locked-quiz">
+      <div class="lock-icon">🔒</div>
+      <h1>${esc(opening.name)} quiz is locked</h1>
+      <p>Complete <b>${QUIZ_UNLOCK} lines</b> of this opening in <b>Practice</b> mode to unlock the quiz. You've done <b>${done} / ${QUIZ_UNLOCK}</b>.</p>
+      <div class="bar" style="margin:12px auto;max-width:320px"><span style="width:${(done / QUIZ_UNLOCK) * 100}%"></span></div>
+      <div class="btn-row" style="justify-content:center">
+        <a class="btn primary" href="#/train/${opening.id}?mode=practice">Practice a line</a>
+        <a class="btn" href="#/train/${opening.id}?mode=learn">Learn first</a>
+      </div>
+    </section>`));
+    return;
+  }
   const all = quizPositions(opening);
   const userColor = opening.side;
 

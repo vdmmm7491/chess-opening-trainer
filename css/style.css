@@ -222,6 +222,14 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .kv { display: flex; justify-content: space-between; font-size: 0.92rem; padding: 3px 0; gap: 8px; }
 
 /* ---------- quiz ---------- */
+.btn.locked { opacity: 0.6; }
+.locked-quiz { max-width: 520px; margin: 30px auto; text-align: center; padding: 28px 20px; }
+.locked-quiz .lock-icon { font-size: 2.5rem; }
+.locked-quiz p { color: var(--muted); line-height: 1.5; }
+.status .unlock {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-size: 0.95rem;
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--text);
+}
 .quiz-progress { display: flex; gap: 14px; align-items: baseline; font-weight: 700; font-size: 0.95rem; }
 .quiz-progress .q-score { color: var(--good); }
 .quiz-progress .quiz-best { margin-left: auto; font-weight: 400; font-size: 0.85rem; }

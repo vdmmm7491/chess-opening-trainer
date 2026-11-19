@@ -1,5 +1,5 @@
 import { OPENINGS, LEVELS, levelForRating } from '../openings.js';
-import { mastery, dueCount, summary, getSettings, setSetting } from '../progress.js';
+import { mastery, dueCount, summary, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { h, esc } from '../ui.js';
 import { pieceUrl } from '../board.js';
 
@@ -74,7 +74,9 @@ export function render(root) {
         <div class="btn-row">
           <a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>
           <a class="btn small" href="#/train/${o.id}?mode=learn">Learn</a>
-          <a class="btn small" href="#/quiz/${o.id}">🧩 Quiz</a>
+          ${quizUnlocked(o)
+            ? `<a class="btn small" href="#/quiz/${o.id}">🧩 Quiz</a>`
+            : `<a class="btn small locked" href="#/quiz/${o.id}" title="Complete ${QUIZ_UNLOCK} lines in Practice to unlock">🔒 Quiz ${linesLearned(o)}/${QUIZ_UNLOCK}</a>`}
         </div>
       </article>`));
     }

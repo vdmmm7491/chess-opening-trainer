@@ -102,6 +102,13 @@ export function streak() {
   return n;
 }
 
+/** Lines of this opening completed at least once in Practice mode. */
+export function linesLearned(opening) {
+  return opening.lines.filter((_, i) => (lineStats(opening.id, i)?.attempts || 0) > 0).length;
+}
+export const QUIZ_UNLOCK = 2;
+export function quizUnlocked(opening) { return linesLearned(opening) >= Math.min(QUIZ_UNLOCK, opening.lines.length); }
+
 /** Save a finished quiz round. Best is compared by percentage. */
 export function recordQuiz(openingId, score, total) {
   state.quiz = state.quiz || {};

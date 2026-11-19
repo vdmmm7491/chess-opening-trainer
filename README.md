@@ -9,7 +9,7 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Practice** mode tests you from memory. Two wrong tries reveal the answer.
   - **Spaced repetition** brings lines you get wrong back sooner (levels 0–5).
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
-- **🧩 Quiz** for every opening: 10 random positions from all its lines (move 3 onwards, always your move). Find the book move in one try. The coach explains the answer, and your best score is saved.
+- **🧩 Quiz** for every opening, unlocked once you've completed 2 of its lines in Practice mode: 10 random positions from all its lines (move 3 onwards, always your move). Find the book move in one try. The coach explains the answer, and your best score is saved.
 - **Opening coach** (🎓 panel in the trainer, can be switched off):
   - every move of every book line (972 positions) has a hand-written explanation of the idea behind it, based on standard opening theory. It covers your moves and your opponent's, plus the plan for each opening and a "Read more" link to a reference article
   - when you play a wrong move, Stockfish works out what it costs, then the coach **plays out how the opponent punishes it** on the board (replayable, and each move is clickable), explains why the book move is better, and lets you try again

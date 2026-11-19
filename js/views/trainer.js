@@ -1,5 +1,5 @@
 import { getOpening, lineMoves } from '../openings.js';
-import { recordLine, pickLine, lineStats, getSettings, setSetting } from '../progress.js';
+import { recordLine, pickLine, lineStats, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
@@ -28,7 +28,7 @@ export function render(root, { id, query }) {
         <div class="btn-row" style="margin:10px 0">
           <button class="btn small" data-mode="learn">Learn</button>
           <button class="btn small" data-mode="practice">Practice</button>
-          <a class="btn small" href="#/quiz/${opening.id}">🧩 Quiz</a>
+          <a class="btn small quiz-link" href="#/quiz/${opening.id}">🧩 Quiz</a>
         </div>
         <select class="input line-select" aria-label="Line">
           <option value="">Auto – spaced repetition</option>
@@ -151,6 +151,11 @@ export function render(root, { id, query }) {
     view.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('primary', b.dataset.mode === mode));
     $('[data-act="hint"]').disabled = busy || phase !== 'book' || chess.turn() !== userColor;
     $('[data-act="playon"]').disabled = phase !== 'done';
+    const q = $('.quiz-link');
+    const open = quizUnlocked(opening);
+    q.classList.toggle('locked', !open);
+    q.textContent = open ? '🧩 Quiz' : `🔒 Quiz ${linesLearned(opening)}/${QUIZ_UNLOCK}`;
+    q.title = open ? '' : `Complete ${QUIZ_UNLOCK} lines in Practice to unlock`;
   }
 
   function start(idx) {
@@ -347,11 +352,17 @@ export function render(root, { id, query }) {
     phase = 'done';
     busy = false;
     if (mode === 'practice') {
+      const wasLocked = !quizUnlocked(opening);
       const s = recordLine(opening.id, lineIdx, mistakes);
+      const justUnlocked = wasLocked && quizUnlocked(opening);
       setStatus(mistakes === 0
         ? `🎉 Line complete with no mistakes! (level ${s.box}/5)`
         : `Line complete with ${mistakes} mistake${mistakes > 1 ? 's' : ''}. It will come back sooner for review.`,
         mistakes === 0 ? 'good' : '');
+      if (justUnlocked) {
+        $('.status').insertAdjacentHTML('beforeend',
+          `<div class="unlock">🧩 Quiz unlocked! <a href="#/quiz/${opening.id}">Test yourself now →</a></div>`);
+      }
     } else {
       setStatus('🎓 End of the line! Switch to Practice to test yourself.', 'good');
     }
