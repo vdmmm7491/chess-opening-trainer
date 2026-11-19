@@ -1,0 +1,134 @@
+// Shared UI helpers: eval bar, chess helpers, small DOM utilities.
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
+import { formatEval } from './engine.js';
+import { OPENINGS, lineMoves } from './openings.js';
+
+export { Chess };
+
+export function h(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** Vertical evaluation bar. */
+export class EvalBar {
+  constructor() {
+    this.el = h(`<div class="evalbar" title="Stockfish evaluation">
+      <div class="white"></div><span class="label top"></span><span class="label bottom"></span></div>`);
+    this.fill = this.el.querySelector('.white');
+    this.top = this.el.querySelector('.label.top');
+    this.bottom = this.el.querySelector('.label.bottom');
+    this.set(null);
+  }
+  setOrientation(color) { this.el.classList.toggle('flipped', color === 'b'); }
+  setVisible(v) { this.el.classList.toggle('hidden', !v); }
+  set(info) {
+    let pct = 50;
+    if (info) {
+      if (info.mate !== undefined) pct = info.mate > 0 ? 100 : 0;
+      else pct = 50 + 50 * (2 / (1 + Math.exp(-0.004 * info.cp)) - 1);
+    }
+    pct = Math.max(2, Math.min(98, pct));
+    if (info?.mate === 0) pct = info.whiteCp > 0 ? 100 : 0;
+    this.fill.style.height = pct + '%';
+    const txt = info ? formatEval(info).replace('+', '') : '';
+    const whiteAhead = !info || info.whiteCp >= 0;
+    this.bottom.textContent = whiteAhead ? txt : '';
+    this.top.textContent = whiteAhead ? '' : txt.replace('-', '');
+  }
+}
+
+/** Legal destination squares for a square, as a function bound to a chess instance. */
+export function destsFn(chess) {
+  return (sq) => chess.moves({ square: sq, verbose: true }).map((m) => m.to);
+}
+
+export function checkSquare(chess) {
+  if (!chess.inCheck()) return null;
+  const turn = chess.turn();
+  for (const row of chess.board()) for (const p of row) if (p && p.type === 'k' && p.color === turn) return p.square;
+  return null;
+}
+
+export function lastMoveOf(chess) {
+  const hist = chess.history({ verbose: true });
+  const m = hist[hist.length - 1];
+  return m ? { from: m.from, to: m.to } : null;
+}
+
+/** Convert a UCI PV into SAN text starting from fen. */
+export function pvToSan(fen, pv, max = 8) {
+  const c = new Chess(fen);
+  const out = [];
+  let num = Number(fen.split(' ')[5]) || 1;
+  for (const uci of pv.slice(0, max)) {
+    try {
+      const m = c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+      if (m.color === 'w') out.push(`${num}. ${m.san}`);
+      else { out.push(out.length === 0 ? `${num}... ${m.san}` : m.san); num++; }
+    } catch { break; }
+  }
+  return out.join(' ');
+}
+
+export function renderMoveList(el, sans, onClick, current = sans.length - 1) {
+  el.innerHTML = '';
+  sans.forEach((san, i) => {
+    if (i % 2 === 0) el.appendChild(h(`<span class="num">${i / 2 + 1}.</span>`));
+    const s = h(`<span class="mv${i === current ? ' cur' : ''}">${esc(san)}</span>`);
+    if (onClick) s.addEventListener('click', () => onClick(i));
+    el.appendChild(s);
+  });
+  el.scrollTop = el.scrollHeight;
+}
+
+/** Find the deepest book line in our repertoire that matches a SAN history. */
+export function findBook(sans) {
+  let best = null;
+  for (const o of OPENINGS) {
+    o.lines.forEach((line, idx) => {
+      const mv = lineMoves(line);
+      let n = 0;
+      while (n < sans.length && n < mv.length && mv[n] === sans[n]) n++;
+      if (n > 0 && (!best || n > best.depth)) best = { opening: o, lineIdx: idx, line, depth: n, inBook: n === sans.length };
+    });
+  }
+  return best;
+}
+
+/** Wire an eval bar + engine-line element to an engine for a given position. */
+export function makeAnalyser(engine, bar, lineEl, board) {
+  let token = 0;
+  return {
+    async run(fen, { depth = 15, showArrow = false } = {}) {
+      const my = ++token;
+      const c = new Chess(fen);
+      if (c.isGameOver()) {
+        engine.stop();
+        if (c.isCheckmate()) bar.set({ mate: 0, whiteCp: c.turn() === 'w' ? -10000 : 10000 });
+        else bar.set({ cp: 0, whiteCp: 0 });
+        if (lineEl) lineEl.textContent = c.isCheckmate() ? 'Checkmate' : 'Draw';
+        if (board && showArrow) board.setArrows([]);
+        return null;
+      }
+      const res = await engine.analyse(fen, {
+        depth,
+        onInfo: (info) => {
+          if (my !== token) return;
+          bar.set(info);
+          if (lineEl) lineEl.textContent = `${formatEval(info)}  d${info.depth}  ${pvToSan(fen, info.pv, 8)}`;
+          if (board && showArrow && info.pv[0]) {
+            board.setArrows([{ from: info.pv[0].slice(0, 2), to: info.pv[0].slice(2, 4), color: 'rgba(76,141,255,0.75)' }]);
+          }
+        },
+      });
+      return my === token ? res : null;
+    },
+    cancel() { token++; engine.stop(); },
+  };
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Opening Trainer – free chess opening practice</title>
+  <meta name="description" content="Free chess opening trainer with Stockfish evaluation, progress tracking and Chess.com game analysis." />
+  <meta name="theme-color" content="#16181d" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <img src="assets/icon.svg" alt="" width="28" height="28" />
+      <span>Opening Trainer</span>
+    </a>
+    <nav class="nav" id="nav">
+      <a href="#/" data-route="home">Openings</a>
+      <a href="#/analysis" data-route="analysis">Analysis</a>
+      <a href="#/progress" data-route="progress">Progress</a>
+      <a href="#/chesscom" data-route="chesscom">Chess.com</a>
+    </nav>
+  </header>
+
+  <main id="app" class="app"></main>
+
+  <footer class="footer">
+    Free &amp; open source · Engine: <a href="https://stockfishchess.org" target="_blank" rel="noopener">Stockfish</a>
+    · Pieces: cburnett (lichess, GPL)
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
