@@ -4,7 +4,7 @@ A **free**, open-source website for practising chess openings. Works on phones a
 
 ## Features
 
-- **Opening trainer**: 14 openings (7 for White, 7 for Black), 40 book lines. You play your side and get instant feedback.
+- **Opening trainer**: 14 openings (7 for White, 7 for Black), 109 book lines, including short lines against the opponent's common alternatives. You play your side and get instant feedback.
   - **Learn** mode shows the next move with an arrow.
   - **Practice** mode tests you from memory. Two wrong tries reveal the answer.
   - **Spaced repetition** brings lines you get wrong back sooner (levels 0–5).
