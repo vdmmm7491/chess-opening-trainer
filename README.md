@@ -11,6 +11,7 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
 - **Stockfish evaluation bar**: Stockfish 10 runs in your browser in a Web Worker. The best engine line is hidden while you practise so it doesn't give away the answer.
 - **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list.
+- **Openings by rating**: every opening is tagged with the levels it suits (Beginner under 1000, Intermediate 1000–1600, Advanced 1600–2000, Expert 2000+) and a note explaining why. Pick a level or type in your rating to filter.
 - **Board you can draw on**: right-click and drag to draw arrows (knight moves get L-shaped arrows), right-click a square to highlight it. Hold Shift, Ctrl or Alt for green, red or blue. Left-click clears them.
 - **Appearance settings** (⚙ in the top bar): 6 piece sets, 6 board colours, dark or light theme.
 - **Progress tracking**: streak, activity heatmap, mastery per opening and line, recent sessions. Export/import moves your progress between devices.
@@ -70,6 +71,9 @@ Edit `js/openings.js` and add an object:
 {
   id: 'my-opening',            // unique, never change it (progress is keyed by it)
   name: 'My Opening', eco: 'B00', side: 'w',   // side = the colour YOU play
+  levels: ['beginner', 'intermediate'],          // beginner (<1000), intermediate (1000–1600),
+                                                 // advanced (1600–2000), expert (2000+)
+  levelNote: 'Why it suits those players.',
   description: 'One sentence about the plans.',
   lines: [
     { name: 'Main line', moves: 'e4 e5 Nf3 Nc6 Bb5' },   // SAN, space-separated, from the start position
@@ -78,6 +82,8 @@ Edit `js/openings.js` and add an object:
 ```
 
 Tip: end each line on **your** move, so the line finishes on something you played.
+
+After editing, open **`/tools/validate.html`** (locally or on the live site, e.g. from your phone). It checks that every move is legal, ids are unique, levels are valid and lines end on your move.
 
 ## Credits & licence
 

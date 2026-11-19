@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Validate openings</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 16px; background: #302e2b; color: #fff; }
+    h1 { font-size: 1.3rem; }
+    .ok { color: #81b64c; } .err { color: #fa412d; } .warn { color: #f7c045; }
+    li { margin: 4px 0; line-height: 1.4; }
+    code { background: #262421; padding: 1px 5px; border-radius: 4px; }
+    a { color: #8fc45a; }
+  </style>
+</head>
+<body>
+  <h1>Opening data check</h1>
+  <p>Checks <code>js/openings.js</code>: every move is legal, ids are unique, levels are valid, and lines end on your move.
+    Open this page after adding or editing openings. <a href="../index.html">← Back to the app</a></p>
+  <div id="out">Checking…</div>
+  <script type="module">
+    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
+    import { OPENINGS, LEVELS } from '../js/openings.js';
+
+    const errors = [], warnings = [];
+    const ids = new Set();
+    let lineCount = 0;
+    for (const o of OPENINGS) {
+      const where = `<b>${o.name || o.id}</b>`;
+      if (!o.id) errors.push(`${where}: missing <code>id</code>`);
+      if (ids.has(o.id)) errors.push(`${where}: duplicate id <code>${o.id}</code>`);
+      ids.add(o.id);
+      if (o.side !== 'w' && o.side !== 'b') errors.push(`${where}: <code>side</code> must be 'w' or 'b'`);
+      if (!Array.isArray(o.levels) || !o.levels.length) errors.push(`${where}: add <code>levels</code>, e.g. ['beginner', 'intermediate']`);
+      else for (const l of o.levels) if (!LEVELS[l]) errors.push(`${where}: unknown level <code>${l}</code> (use ${Object.keys(LEVELS).join(', ')})`);
+      if (!o.levelNote) warnings.push(`${where}: no <code>levelNote</code> explaining who it suits`);
+      if (!o.lines?.length) { errors.push(`${where}: has no lines`); continue; }
+      const seen = new Set();
+      o.lines.forEach((line, i) => {
+        lineCount++;
+        const lw = `${where} line ${i + 1} (${line.name})`;
+        const moves = line.moves.trim().split(/\s+/);
+        if (seen.has(line.moves.trim())) warnings.push(`${lw}: duplicate of another line`);
+        seen.add(line.moves.trim());
+        const c = new Chess();
+        for (let k = 0; k < moves.length; k++) {
+          try { c.move(moves[k]); }
+          catch { errors.push(`${lw}: illegal move <code>${moves[k]}</code> at move ${Math.floor(k / 2) + 1}${k % 2 ? '...' : '.'}`); return; }
+        }
+        const endsOnUser = (moves.length % 2 === 1) === (o.side === 'w');
+        if (!endsOnUser) warnings.push(`${lw}: ends on the opponent's move. Add your reply at the end.`);
+      });
+    }
+    const list = (arr, cls) => arr.length ? `<ul>${arr.map((x) => `<li class="${cls}">${x}</li>`).join('')}</ul>` : '';
+    document.getElementById('out').innerHTML =
+      `<p>${OPENINGS.length} openings, ${lineCount} lines.</p>` +
+      (errors.length ? `<h2 class="err">❌ ${errors.length} error(s)</h2>${list(errors, 'err')}` : '<h2 class="ok">✅ No errors</h2>') +
+      (warnings.length ? `<h2 class="warn">⚠ ${warnings.length} warning(s)</h2>${list(warnings, 'warn')}` : '');
+  </script>
+</body>
+</html>

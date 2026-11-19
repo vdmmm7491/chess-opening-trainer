@@ -5,5 +5,6 @@
 - Routing is hash-based in `js/app.js`. Each view in `js/views/` exports `render(root, {id, query})` and may return a cleanup function.
 - Only ONE shared engine instance (`getEngine()`). A new `analyse()` call stops the running search.
 - Progress lives in localStorage under `opening-trainer.v1` and is keyed by `openingId:lineIndex`. Never rename opening ids or reorder existing lines; add new lines at the end.
-- Validate opening lines after editing `js/openings.js`: every SAN move must be legal, and lines should end on the trainee's move.
+- Every opening needs `levels` (keys of `LEVELS` in `js/openings.js`) and a one-sentence `levelNote`.
+- Validate after editing `js/openings.js` by opening `tools/validate.html` (legal SAN, unique ids, valid levels, lines end on the trainee's move).
 - Local test server: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1` (port 8080).
