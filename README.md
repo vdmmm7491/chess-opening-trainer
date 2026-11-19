@@ -9,6 +9,8 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Practice** mode tests you from memory. Two wrong tries reveal the answer.
   - **Spaced repetition** brings lines you get wrong back sooner (levels 0–5).
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
+- **Famous games** tab: 10 classic games replayable move by move, with key moments explained and the Stockfish eval. Examples are Gelfand–Nakamura 2010 (King's Indian), Fischer–Spassky 1972 (Queen's Gambit, Nimzo-Indian), Deep Blue–Kasparov 1997 (Caro-Kann) and the Evergreen and Opera games. Every score is copied from a published source, linked on each game. There's also an Alien Gambit trap line, clearly marked as analysis.
+- **Alien Gambit** (Witty Alien's knight sacrifice against the Caro-Kann) as a White opening, with its main line, traps and Black's best defences.
 - **🧩 Quiz** for every opening, unlocked once you've completed 2 of its lines in Practice mode: 10 random positions from all its lines (move 3 onwards, always your move). Find the book move in one try. The coach explains the answer, and your best score is saved.
 - **Opening coach** (🎓 panel in the trainer, can be switched off):
   - every move of every book line (972 positions) has a hand-written explanation of the idea behind it, based on standard opening theory. It covers your moves and your opponent's, plus the plan for each opening and a "Read more" link to a reference article

@@ -133,6 +133,23 @@ export const OPENINGS = [
     ],
   },
 
+  {
+    id: 'alien-gambit', name: 'Alien Gambit', eco: 'B15', side: 'w',
+    source: 'https://ramachess.com/articles/alien-gambit/',
+    levels: ['beginner', 'intermediate'],
+    levelNote: 'Full of traps and great in fast games below club level. Objectively unsound: Stockfish gives Black about −1.8 with correct defence.',
+    description: 'Witty Alien\'s 2023 gambit against the Caro-Kann: after 4...Nf6, play 5.Ng5 and sacrifice the knight on f7 to drag Black\'s king out.',
+    lines: [
+      { name: 'Main line – 7.Nf3 c5 8.Bc4+', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ e6 Qe2 cxd4 Bd2 Nc6 O-O-O' },
+      { name: 'Trap – the king walks forward', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ Kg6 Ne5+ Kh7 Qd3+ g6 Qxg6#' },
+      { name: 'Trap – 7...Bg4?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Bg4 Ne5+ Ke8 Nxg4' },
+      { name: 'Trap – 7...Qd5?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Qd5 Bc4 Qxc4 Ne5+ Kg8 Nxc4' },
+      { name: '7.Bc4+ Be6 (best defence)', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Be6 Bxe6+ Kxe6 c4 Kf7 Nf3 e6 O-O' },
+      { name: 'vs 5...Bf5', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 Bf5 Bd3 Bxd3 Qxd3 h6 N5f3 e6 Ne5 Be7 c3' },
+      { name: 'vs 5...c5', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 c5 Bc4 e6 Ne2 a6 a4 Nc6 Nf3 b6 O-O' },
+    ],
+  },
+
   // ---------------- Black ----------------
   {
     id: 'sicilian-najdorf', name: 'Sicilian Najdorf', eco: 'B90–B99', side: 'b',
