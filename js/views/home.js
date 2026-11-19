@@ -74,6 +74,7 @@ export function render(root) {
         <div class="btn-row">
           <a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>
           <a class="btn small" href="#/train/${o.id}?mode=learn">Learn</a>
+          <a class="btn small" href="#/quiz/${o.id}">🧩 Quiz</a>
         </div>
       </article>`));
     }

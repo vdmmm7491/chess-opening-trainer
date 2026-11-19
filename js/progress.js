@@ -102,6 +102,21 @@ export function streak() {
   return n;
 }
 
+/** Save a finished quiz round. Best is compared by percentage. */
+export function recordQuiz(openingId, score, total) {
+  state.quiz = state.quiz || {};
+  const q = state.quiz[openingId] || { rounds: 0, best: 0, bestOf: total, last: 0 };
+  q.rounds++;
+  if (score / total >= q.best / (q.bestOf || 1)) { q.best = score; q.bestOf = total; }
+  q.last = Date.now();
+  state.quiz[openingId] = q;
+  const d = today();
+  state.days[d] = (state.days[d] || 0) + 1;
+  save();
+  return q;
+}
+export function quizStats(openingId) { return state.quiz?.[openingId] || null; }
+
 export function activityDays() { return state.days; }
 export function history() { return state.history; }
 

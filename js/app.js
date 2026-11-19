@@ -4,6 +4,7 @@ import * as trainer from './views/trainer.js';
 import * as analysis from './views/analysis.js';
 import * as progress from './views/progress.js';
 import * as chesscom from './views/chesscom.js';
+import * as quiz from './views/quiz.js';
 import { applyTheme, openSettings } from './theme.js';
 
 applyTheme();
@@ -29,6 +30,7 @@ function route() {
   let result;
   switch (name) {
     case 'train': result = trainer.render(app, { id: parts[1], query }); name = 'home'; break;
+    case 'quiz': result = quiz.render(app, { id: parts[1], query }); name = 'home'; break;
     case 'analysis': result = analysis.render(app, { query }); break;
     case 'progress': result = progress.render(app, { query }); break;
     case 'chesscom': result = chesscom.render(app, { query }); break;

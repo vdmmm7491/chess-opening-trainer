@@ -28,6 +28,7 @@ export function render(root, { id, query }) {
         <div class="btn-row" style="margin:10px 0">
           <button class="btn small" data-mode="learn">Learn</button>
           <button class="btn small" data-mode="practice">Practice</button>
+          <a class="btn small" href="#/quiz/${opening.id}">🧩 Quiz</a>
         </div>
         <select class="input line-select" aria-label="Line">
           <option value="">Auto – spaced repetition</option>
