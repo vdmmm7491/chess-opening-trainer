@@ -26,6 +26,8 @@
     import { LINE_NOTES } from '../js/line-notes.js';
     import { LINE_NOTES_BLACK } from '../js/line-notes-black.js';
     import { LINE_NOTES_D4 } from '../js/line-notes-d4.js';
+    import { ROUTINE_NOTES } from '../js/notes-routine.js';
+    import { ROUTINE_NOTES_BLACK } from '../js/notes-routine-black.js';
     import { THEORY } from '../js/coach.js';
 
     const errors = [], warnings = [];
@@ -60,7 +62,7 @@
     // Coach notes: keys must be legal move sequences, ideally reached by some line.
     const allLines = OPENINGS.flatMap((o) => o.lines.map((l) => l.moves.trim().split(/\s+/).join(' ')));
     let noteCount = 0;
-    for (const key of Object.keys(NOTES)) {
+    for (const key of [...Object.keys(NOTES), ...Object.keys(ROUTINE_NOTES), ...Object.keys(ROUTINE_NOTES_BLACK)]) {
       noteCount++;
       const c = new Chess();
       let ok = true;

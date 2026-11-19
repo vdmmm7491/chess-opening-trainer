@@ -9,7 +9,7 @@ export const NOTES = {
   'd4': 'Takes the centre. The pawn is already protected by the queen, which makes d4 solid.',
   'c4': 'Controls d5 from the side. A flexible start that can turn into many different structures.',
   'e4 e5': 'Meets White in the centre symmetrically. It is the most classical answer.',
-  'e4 e5 Nf3': 'Develops with an attack on the e5 pawn.',
+  'e4 e5 Nf3': 'The most natural move: develops the knight towards the centre and attacks e5, so Black must spend the next move defending it. It also gets White one step closer to castling.',
   'e4 e5 Nf3 Nc6': 'Develops the knight while defending e5.',
   'd4 Nf6': 'Develops and stops e4. Black stays flexible about which setup to choose.',
 

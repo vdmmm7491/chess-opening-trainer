@@ -260,9 +260,14 @@ export function render(root, { id, query }) {
     const playedNote = noteFor([...chess.history(), played.san]); // in case it's a known (non-repertoire) move
     const pawns = (res.loss / 100).toFixed(1);
     const reply = res.steps[0];
+    const playable = res.kind === 'Playable';
+    // Always explain the book move itself: this is what the player needs to remember.
+    const bookBlock = `<div class="coach-book"><b>Why ${esc(moveNo(ply, expected))} is the book move</b>
+      ${bookWhy.map((r) => `<p>${esc(r)}</p>`).join('')}</div>`;
     let verdict;
-    if (res.kind === 'Playable') {
-      verdict = `<p>Not a bad move: Stockfish rates it ${res.loss < 15 ? 'about as good as' : `only ${pawns} pawns worse than`} the book move. But it isn't your repertoire move, so let's stick to the plan.</p>` +
+    if (playable) {
+      verdict = `<p><b>${esc(played.san)}</b> is a reasonable move, but it isn't part of this repertoire. ` +
+        `Stick to the book move so you get the positions you have practised.</p>` +
         (playedNote ? `<p class="muted">About ${esc(played.san)}: ${esc(playedNote)}</p>` : '');
     } else {
       verdict = `<p><b>${esc(played.san)}</b> is ${res.kind === 'Inaccuracy' ? 'an' : 'a'} <b>${res.kind.toLowerCase()}</b>, costing about <b>${pawns}</b> pawns.` +
@@ -276,13 +281,14 @@ export function render(root, { id, query }) {
       return `<span class="ref-mv ${s.color === res.us ? 'mine' : 'theirs'}" data-i="${i}">${esc(label)}</span>`;
     }).join(' ');
 
-    coachBody.innerHTML = `<div class="coach-entry mistake">
-      <div class="coach-title"><span class="kind kind-${res.kind.toLowerCase()}">${res.kind}</span> ${esc(moveNo(ply, played.san))}</div>
+    coachBody.innerHTML = `<div class="coach-entry mistake${playable ? ' alt' : ''}">
+      <div class="coach-title"><span class="kind kind-${res.kind.toLowerCase()}">${playable ? 'Not the book move' : res.kind}</span> ${esc(moveNo(ply, played.san))}</div>
+      ${playable ? bookBlock : ''}
       ${verdict}
-      ${res.steps.length && res.kind !== 'Playable' ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
-      <div class="coach-better"><b>Why ${esc(moveNo(ply, expected))} is better</b><ul>${bookWhy.map((r) => `<li>${esc(r)}</li>`).join('')}</ul></div>
+      ${res.steps.length && !playable ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
+      ${playable ? '' : bookBlock}
       <div class="btn-row" style="margin-top:10px">
-        ${res.steps.length && res.kind !== 'Playable' ? '<button class="btn small" data-coach="replay">▶ Replay</button>' : ''}
+        ${res.steps.length && !playable ? '<button class="btn small" data-coach="replay">▶ Replay</button>' : ''}
         <button class="btn small primary" data-coach="retry">↺ Try again</button>
       </div>
     </div>`;

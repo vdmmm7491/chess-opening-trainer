@@ -5,6 +5,8 @@ import { NOTES } from './notes.js';
 import { LINE_NOTES } from './line-notes.js';
 import { LINE_NOTES_BLACK } from './line-notes-black.js';
 import { LINE_NOTES_D4 } from './line-notes-d4.js';
+import { ROUTINE_NOTES } from './notes-routine.js';
+import { ROUTINE_NOTES_BLACK } from './notes-routine-black.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 /** All theory notes keyed by the SAN sequence. notes.js wins over per-line notes. */
@@ -24,7 +26,7 @@ export const THEORY = (() => {
       });
     });
   }
-  return { ...map, ...NOTES };
+  return { ...map, ...ROUTINE_NOTES, ...ROUTINE_NOTES_BLACK, ...NOTES };
 })();
 
 const FILES = 'abcdefgh';

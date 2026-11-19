@@ -241,7 +241,12 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .coach-entry.mistake { box-shadow: inset 3px 0 0 var(--bad); opacity: 1; }
 .coach-title { font-weight: 600; margin-bottom: 2px; }
 .coach-idea { color: var(--text); }
-.coach-better { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.coach-book {
+  margin: 8px 0; padding: 9px 11px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel)); box-shadow: inset 3px 0 0 var(--accent);
+}
+.coach-book p { margin: 4px 0 0; }
+.coach-entry.mistake.alt { box-shadow: inset 3px 0 0 #48b4f0; }
 .kind { display: inline-block; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; margin-right: 4px; color: #fff; }
 .kind-blunder { background: #fa412d; } .kind-mistake { background: #e58f2a; }
 .kind-inaccuracy { background: #d6b13a; color: #222; } .kind-playable { background: #5d9a2c; }
