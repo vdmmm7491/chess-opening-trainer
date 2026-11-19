@@ -295,8 +295,14 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
-  .play-layout { grid-template-columns: 1fr; }
+  .play-layout { grid-template-columns: 1fr; gap: 10px; }
   .board-wrap { max-width: 100%; }
+  /* Phones/tablets: put the move status and the coach right under the board. */
+  .side .status-card { order: -2; }
+  .side .coach { order: -1; }
+  .side .status-card .status { min-height: 0; }
+  /* Only the newest coach message, so it fits on screen. */
+  .coach-body .coach-entry:not(:first-child) { display: none; }
 }
 @media (max-width: 640px) {
   .app { padding: 10px 8px; }

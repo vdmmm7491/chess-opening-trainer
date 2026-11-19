@@ -34,7 +34,7 @@ export function render(root, { id, query }) {
           ${opening.lines.map((l, i) => `<option value="${i}">${i + 1}. ${esc(l.name)}</option>`).join('')}
         </select>
       </div>
-      <div class="card">
+      <div class="card status-card">
         <div class="status"></div>
         <div class="muted line-info" style="font-size:.85rem;margin:6px 0"></div>
         <div class="movelist"></div>
