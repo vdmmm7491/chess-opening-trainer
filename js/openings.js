@@ -23,6 +23,7 @@ export const OPENINGS = [
   // ---------------- White ----------------
   {
     id: 'italian', name: 'Italian Game', eco: 'C50–C54', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/Italian_Game',
     levels: ['beginner', 'intermediate', 'advanced'],
     levelNote: 'Teaches the basics (fast development, castling, centre control) and stays playable all the way up.',
     description: 'Develop fast, aim the bishop at f7 and build a slow, solid centre with c3 and d3/d4.',
@@ -38,6 +39,7 @@ export const OPENINGS = [
   },
   {
     id: 'ruy-lopez', name: 'Ruy López', eco: 'C60–C99', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/Ruy_Lopez',
     levels: ['intermediate', 'advanced', 'expert'],
     levelNote: 'Deep theory and slow manoeuvring plans pay off once you understand pawn structures.',
     description: 'The Spanish: pressure the e5 defender with Bb5 and play for a long-term central advantage.',
@@ -54,6 +56,7 @@ export const OPENINGS = [
   },
   {
     id: 'scotch', name: 'Scotch Game', eco: 'C44–C45', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/Scotch_Game',
     levels: ['beginner', 'intermediate', 'advanced'],
     levelNote: 'Open, direct positions with clear plans and little theory to memorise.',
     description: 'Open the centre immediately with d4 for active, direct piece play.',
@@ -67,6 +70,7 @@ export const OPENINGS = [
   },
   {
     id: 'queens-gambit', name: "Queen's Gambit", eco: 'D06–D69', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/Queen%27s_Gambit',
     levels: ['intermediate', 'advanced', 'expert'],
     levelNote: 'Positional and principled. Best once you are comfortable with slower, strategic games.',
     description: 'Offer the c-pawn to deflect Black from the centre. Positional, principled, timeless.',
@@ -83,6 +87,7 @@ export const OPENINGS = [
   },
   {
     id: 'london', name: 'London System', eco: 'D02 / A48', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/London_System',
     levels: ['beginner', 'intermediate'],
     levelNote: 'The same setup against almost everything, so there is very little to memorise.',
     description: 'A reliable setup: d4, Bf4, e3, Nf3, c3 and Bd3 against almost anything.',
@@ -98,6 +103,7 @@ export const OPENINGS = [
   },
   {
     id: 'english', name: 'English Opening', eco: 'A10–A39', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/English_Opening',
     levels: ['advanced', 'expert'],
     levelNote: 'Flexible and transpositional. You need a feel for structures more than memorised lines.',
     description: 'Flexible flank opening – control d5 with c4, fianchetto and play a reversed Sicilian.',
@@ -113,6 +119,7 @@ export const OPENINGS = [
   },
   {
     id: 'vienna', name: 'Vienna Game', eco: 'C25–C29', side: 'w',
+    source: 'https://en.wikipedia.org/wiki/Vienna_Game',
     levels: ['beginner', 'intermediate'],
     levelNote: 'Aggressive, full of traps, and opponents at club level often go wrong early.',
     description: 'Nc3 first, then an early f4 – an aggressive weapon against 1...e5.',
@@ -129,6 +136,7 @@ export const OPENINGS = [
   // ---------------- Black ----------------
   {
     id: 'sicilian-najdorf', name: 'Sicilian Najdorf', eco: 'B90–B99', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/Sicilian_Defence,_Najdorf_Variation',
     levels: ['advanced', 'expert'],
     levelNote: 'Very sharp with huge amounts of theory. One wrong move can lose on the spot.',
     description: 'The sharpest answer to 1.e4. ...a6 keeps options open for ...e5 or ...e6 and queenside play.',
@@ -148,6 +156,7 @@ export const OPENINGS = [
   },
   {
     id: 'french', name: 'French Defence', eco: 'C00–C19', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/French_Defence',
     levels: ['intermediate', 'advanced'],
     levelNote: 'Solid, with clear pawn-break plans (...c5, ...f6), but the light-squared bishop needs care.',
     description: 'Solid and counter-attacking: ...e6 and ...d5, then strike back with ...c5 and ...f6.',
@@ -165,6 +174,7 @@ export const OPENINGS = [
   },
   {
     id: 'caro-kann', name: 'Caro-Kann Defence', eco: 'B10–B19', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/Caro%E2%80%93Kann_Defence',
     levels: ['beginner', 'intermediate', 'advanced'],
     levelNote: 'Safe and sound with few early traps. A reliable defence at every level.',
     description: 'Rock-solid: ...c6 and ...d5 with a healthy pawn structure and the light bishop outside the chain.',
@@ -182,6 +192,7 @@ export const OPENINGS = [
   },
   {
     id: 'scandinavian', name: 'Scandinavian Defence', eco: 'B01', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/Scandinavian_Defense',
     levels: ['beginner', 'intermediate'],
     levelNote: 'Forces the game onto your terms from move one, with simple development plans.',
     description: 'Challenge e4 immediately with ...d5. Simple plans and easy development.',
@@ -196,6 +207,7 @@ export const OPENINGS = [
   },
   {
     id: 'open-game-black', name: '1...e5 Open Games', eco: 'C40–C59', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/Open_Game',
     levels: ['beginner', 'intermediate', 'advanced'],
     levelNote: 'The classical answer to 1.e4. It teaches open-game principles you will use forever.',
     description: 'Meet 1.e4 with the classical 1...e5 – correct answers to the Italian, Scotch and friends.',
@@ -214,6 +226,7 @@ export const OPENINGS = [
   },
   {
     id: 'kings-indian', name: "King's Indian Defence", eco: 'E60–E99', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/King%27s_Indian_Defence',
     levels: ['advanced', 'expert'],
     levelNote: 'You give White the centre on purpose, so you must know exactly when and how to strike back.',
     description: 'Let White take the centre, then hit back with ...e5 and a kingside pawn storm.',
@@ -230,6 +243,7 @@ export const OPENINGS = [
   },
   {
     id: 'nimzo', name: 'Nimzo-Indian Defence', eco: 'E20–E59', side: 'b',
+    source: 'https://en.wikipedia.org/wiki/Nimzo-Indian_Defence',
     levels: ['advanced', 'expert'],
     levelNote: 'Subtle positional ideas: bishop pair vs. structure and control of e4.',
     description: 'Pin the c3-knight with ...Bb4 and fight for e4 with pieces rather than pawns.',

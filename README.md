@@ -9,12 +9,11 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Practice** mode tests you from memory. Two wrong tries reveal the answer.
   - **Spaced repetition** brings lines you get wrong back sooner (levels 0–5).
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
-- **Coach** (🎓 panel, can be switched off):
-  - explains every move as it's played, yours and your opponent's: development, centre control, attacks, pins, forks, threats to f7, castling, gambits and more
-  - hand-written "💡 idea" notes for the key moves of every opening (`js/notes.js`)
+- **Opening coach** (🎓 panel in the trainer, can be switched off):
+  - every move of every book line (972 positions) has a hand-written explanation of the idea behind it, based on standard opening theory. It covers your moves and your opponent's, plus the plan for each opening and a "Read more" link to a reference article
   - when you play a wrong move, Stockfish works out what it costs, then the coach **plays out how the opponent punishes it** on the board (replayable, and each move is clickable), explains why the book move is better, and lets you try again
   - harmless alternatives are labelled "Playable" instead of being treated as blunders
-  - the analysis board also explains the last move played
+  - the coach is for the opening only. It switches off in free play after the book ends
 - **Stockfish evaluation bar**: Stockfish 10 runs in your browser in a Web Worker. The best engine line is hidden while you practise so it doesn't give away the answer.
 - **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list.
 - **Openings by rating**: every opening is tagged with the levels it suits (Beginner under 1000, Intermediate 1000–1600, Advanced 1600–2000, Expert 2000+) and a note explaining why. Pick a level or type in your rating to filter.

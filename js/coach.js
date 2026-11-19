@@ -2,6 +2,30 @@
 // uses Stockfish to show how the opponent can punish it.
 import { Chess } from './ui.js';
 import { NOTES } from './notes.js';
+import { LINE_NOTES } from './line-notes.js';
+import { LINE_NOTES_BLACK } from './line-notes-black.js';
+import { LINE_NOTES_D4 } from './line-notes-d4.js';
+import { OPENINGS, lineMoves } from './openings.js';
+
+/** All theory notes keyed by the SAN sequence. notes.js wins over per-line notes. */
+export const THEORY = (() => {
+  const map = {};
+  const all = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK };
+  for (const o of OPENINGS) {
+    (all[o.id] || []).forEach((entries, li) => {
+      const mv = o.lines[li] ? lineMoves(o.lines[li]) : [];
+      entries.forEach((e, i) => {
+        const [san, ...rest] = e.split('|');
+        const text = rest.join('|').trim();
+        if (text && mv[i] === san) {
+          const key = mv.slice(0, i + 1).join(' ');
+          if (!map[key]) map[key] = text;
+        }
+      });
+    });
+  }
+  return { ...map, ...NOTES };
+})();
 
 const FILES = 'abcdefgh';
 const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
@@ -210,7 +234,7 @@ export function explainMove(fen, san, ctx = {}, max = 3) {
 
 /** Hand-written idea for the move that ends this SAN history, if we have one. */
 export function noteFor(sans) {
-  return NOTES[sans.join(' ')] || null;
+  return THEORY[sans.join(' ')] || null;
 }
 
 const clamp = (v) => Math.max(-2000, Math.min(2000, v));

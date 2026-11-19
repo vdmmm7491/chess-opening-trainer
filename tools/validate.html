@@ -23,6 +23,10 @@
     import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
     import { OPENINGS, LEVELS } from '../js/openings.js';
     import { NOTES } from '../js/notes.js';
+    import { LINE_NOTES } from '../js/line-notes.js';
+    import { LINE_NOTES_BLACK } from '../js/line-notes-black.js';
+    import { LINE_NOTES_D4 } from '../js/line-notes-d4.js';
+    import { THEORY } from '../js/coach.js';
 
     const errors = [], warnings = [];
     const ids = new Set();
@@ -63,6 +67,32 @@
       for (const s of key.split(' ')) { try { c.move(s); } catch { errors.push(`Coach note <code>${key}</code>: illegal move <code>${s}</code>`); ok = false; break; } }
       if (ok && !allLines.some((l) => l === key || l.startsWith(key + ' '))) warnings.push(`Coach note <code>${key}</code> isn't reached by any line`);
     }
+
+    // Per-line theory notes: each entry's move must match the line, and every position needs a note.
+    const ALL_LINE_NOTES = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK };
+    for (const [id, lines] of Object.entries(ALL_LINE_NOTES)) {
+      const o = OPENINGS.find((x) => x.id === id);
+      if (!o) { errors.push(`Line notes for unknown opening <code>${id}</code>`); continue; }
+      lines.forEach((entries, li) => {
+        const line = o.lines[li];
+        if (!line) { errors.push(`<b>${o.name}</b>: notes for line ${li + 1}, which doesn't exist`); return; }
+        const mv = line.moves.trim().split(/\s+/);
+        if (entries.length > mv.length) errors.push(`<b>${o.name}</b> line ${li + 1}: more notes (${entries.length}) than moves (${mv.length})`);
+        entries.forEach((e, i) => {
+          const san = e.split('|')[0];
+          if (mv[i] !== san) errors.push(`<b>${o.name}</b> line ${li + 1}, note ${i + 1}: says <code>${san}</code> but the move is <code>${mv[i]}</code>`);
+        });
+      });
+    }
+    let missingNotes = 0;
+    for (const o of OPENINGS) o.lines.forEach((l, li) => {
+      const mv = l.moves.trim().split(/\s+/);
+      for (let i = 1; i <= mv.length; i++) {
+        const key = mv.slice(0, i).join(' ');
+        if (!THEORY[key]) { missingNotes++; if (missingNotes <= 40) warnings.push(`<b>${o.name}</b> line ${li + 1}: no coach note for move ${Math.ceil(i / 2)}${i % 2 ? '.' : '...'}${mv[i - 1]}`); }
+      }
+    });
+    if (missingNotes > 40) warnings.push(`…and ${missingNotes - 40} more moves without a coach note`);
 
     const list = (arr, cls) => arr.length ? `<ul>${arr.map((x) => `<li class="${cls}">${x}</li>`).join('')}</ul>` : '';
     document.getElementById('out').innerHTML =

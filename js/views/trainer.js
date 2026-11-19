@@ -98,15 +98,16 @@ export function render(root, { id, query }) {
     const c = new Chess();
     let prev = null;
     for (const s of sansBefore) { const m = c.move(s); prev = { to: m.to, captured: m.captured }; }
+    // Theory notes come first; the rule-based explainer is only a fallback for moves without one.
     const note = noteFor([...sansBefore, san]);
-    const reasons = explainMove(c.fen(), san, { prev }, note ? 2 : 3);
+    const reasons = note ? [] : explainMove(c.fen(), san, { prev }, 2);
     const label = moveNo(sansBefore.length, san);
     const title = who === 'you' ? `✓ Why <b>${esc(label)}</b> is good`
       : who === 'next' ? `Your move: <b>${esc(label)}</b>`
         : `Opponent played <b>${esc(label)}</b>`;
     return `<div class="coach-entry ${who}">
       <div class="coach-title">${title}</div>
-      ${note ? `<p class="coach-idea">💡 ${esc(note)}</p>` : ''}
+      ${note ? `<p class="coach-idea">${esc(note)}</p>` : ''}
       ${reasons.length ? `<ul>${reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
     </div>`;
   }
@@ -114,7 +115,8 @@ export function render(root, { id, query }) {
   function coachIntro() {
     coachEntries = [{ html: `<div class="coach-entry intro"><div class="coach-title">The plan</div>
       <p class="coach-idea">${esc(opening.description)}</p>
-      ${opening.levelNote ? `<p class="muted" style="margin:6px 0 0;font-size:.85rem">${esc(opening.levelNote)}</p>` : ''}</div>` }];
+      ${opening.levelNote ? `<p class="muted" style="margin:6px 0 0;font-size:.85rem">${esc(opening.levelNote)}</p>` : ''}
+      ${opening.source ? `<p style="margin:8px 0 0;font-size:.85rem"><a href="${esc(opening.source)}" target="_blank" rel="noopener">📚 Read more about the ${esc(opening.name)}</a></p>` : ''}</div>` }];
     coachRender();
   }
 
@@ -255,11 +257,13 @@ export function render(root, { id, query }) {
 
     const bookNote = noteFor([...chess.history(), expected]);
     const bookWhy = bookNote ? [bookNote] : explainMove(chess.fen(), expected, {}, 2);
+    const playedNote = noteFor([...chess.history(), played.san]); // in case it's a known (non-repertoire) move
     const pawns = (res.loss / 100).toFixed(1);
     const reply = res.steps[0];
     let verdict;
     if (res.kind === 'Playable') {
-      verdict = `<p>Not a bad move: Stockfish rates it ${res.loss < 15 ? 'about as good as' : `only ${pawns} pawns worse than`} the book move. But it isn't your repertoire move, so let's stick to the plan.</p>`;
+      verdict = `<p>Not a bad move: Stockfish rates it ${res.loss < 15 ? 'about as good as' : `only ${pawns} pawns worse than`} the book move. But it isn't your repertoire move, so let's stick to the plan.</p>` +
+        (playedNote ? `<p class="muted">About ${esc(played.san)}: ${esc(playedNote)}</p>` : '');
     } else {
       verdict = `<p><b>${esc(played.san)}</b> is ${res.kind === 'Inaccuracy' ? 'an' : 'a'} <b>${res.kind.toLowerCase()}</b>, costing about <b>${pawns}</b> pawns.` +
         (res.mateAgainst ? ' It even allows a forced checkmate!' : '') + '</p>' +
@@ -384,6 +388,9 @@ export function render(root, { id, query }) {
       case 'next': start(fixedLine !== null ? fixedLine : pickLine(opening, lineIdx)); break;
       case 'playon':
         phase = 'free';
+        coachToken++;
+        coachEntries = [{ html: '<div class="coach-entry"><p class="muted">The coach covers the opening only. You\'re out of book now, so play on and use the eval bar.</p></div>' }];
+        coachRender();
         setStatus('Free play against Stockfish: the book is over, so keep going!');
         sync();
         if (chess.turn() !== userColor) engineReply();
