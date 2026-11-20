@@ -43,7 +43,16 @@ function viewer(root, id) {
   const o = g.openingId ? getOpening(g.openingId) : null;
 
   const view = h(`<div class="play-layout">
-    <div><div class="board-wrap"><div class="board"></div></div></div>
+    <div>
+      <div class="board-wrap"><div class="board"></div></div>
+      <div class="board-nav">
+        <button class="btn" data-act="first" aria-label="First move">⏮</button>
+        <button class="btn" data-act="back" aria-label="Previous move">◀</button>
+        <button class="btn primary" data-act="play">▶ Play</button>
+        <button class="btn" data-act="fwd" aria-label="Next move">▶|</button>
+        <button class="btn" data-act="last" aria-label="Last move">⏭</button>
+      </div>
+    </div>
     <aside class="side">
       <div class="card">
         <a href="#/games" class="muted" style="font-size:.85rem">← All famous games</a>
@@ -54,12 +63,7 @@ function viewer(root, id) {
       <div class="card status-card">
         <div class="movelist"></div>
         <div class="btn-row" style="margin-top:10px">
-          <button class="btn small" data-act="first">⏮</button>
-          <button class="btn small" data-act="back">◀</button>
-          <button class="btn small primary" data-act="play">▶ Play</button>
-          <button class="btn small" data-act="fwd">▶|</button>
-          <button class="btn small" data-act="last">⏭</button>
-          <button class="btn small" data-act="flip">⇅</button>
+          <button class="btn small" data-act="flip">⇅ Flip</button>
         </div>
       </div>
       <div class="card coach">

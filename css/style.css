@@ -333,3 +333,9 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 /* Chess.com tab: recent games */
 .game-row { cursor: pointer; }
 .game-row:hover, .game-row:focus-visible { background: var(--panel-hover); outline: none; }
+
+/* Big previous/next buttons right under the board (easy to tap on phones) */
+.board-nav { display: flex; gap: 8px; width: 100%; max-width: min(660px, calc(100vh - 130px)); margin: 10px auto 0; }
+.board-nav .btn { flex: 1; min-height: 52px; font-size: 1.4rem; padding: 8px 4px; touch-action: manipulation; }
+.board-nav .btn[data-act="play"] { flex: 1.6; font-size: 1.05rem; }
+@media (max-width: 900px) { .board-nav { max-width: 100%; } }
