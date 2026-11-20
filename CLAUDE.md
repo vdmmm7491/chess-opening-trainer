@@ -5,7 +5,7 @@
 - Routing is hash-based in `js/app.js`. Each view in `js/views/` exports `render(root, {id, query})` and may return a cleanup function.
 - Game review: `#/analysis?review=w|b&moves=…` (built by `reviewHref` in `js/chesscom.js`) runs `engineCheck` on the game, then explains the worst move with `analyseMistake`. Results are cached per game URL in `reviewCache`, which the Chess.com tab's "Recent games" list also reads.
 - Only ONE shared engine instance (`getEngine()`). A new `analyse()` call stops the running search.
-- `Board.setFen()` animates by diffing the old and new position (slides, capture fades, check/mate/promotion effects). Pass the real `lastMove` so promotions pair up; it can be switched off in Settings → Animations and respects prefers-reduced-motion.
+- `Board.setFen()` animates by diffing the old and new position (slides, check/mate/promotion effects; captures have no effect). Pass the real `lastMove` so promotions pair up; it can be switched off in Settings → Animations and respects prefers-reduced-motion.
 - Progress lives in localStorage under `opening-trainer.v1` and is keyed by `openingId:lineIndex`. Never rename opening ids or reorder existing lines; add new lines at the end.
 - Every opening needs `levels` (keys of `LEVELS` in `js/openings.js`) and a one-sentence `levelNote`.
 - Validate after editing `js/openings.js` by opening `tools/validate.html` (legal SAN, unique ids, valid levels, lines end on the trainee's move).

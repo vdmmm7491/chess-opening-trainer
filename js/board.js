@@ -3,7 +3,7 @@
 // - Right-click drag: draw arrows; right-click a square: highlight it (Shift/Ctrl/Alt = other colours)
 // - Left-click anywhere clears drawn arrows and highlights
 // - setFen() animates the change: pieces slide (castling moves both king and rook), captured pieces
-//   fade out, a promoted pawn turns into its new piece, check pulses the king, checkmate topples it.
+//   vanish when taken, a promoted pawn turns into its new piece, check pulses the king, checkmate topples it.
 import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
 import { pieceSet, animationsOn } from './theme.js';
 
@@ -187,25 +187,24 @@ export class Board {
         setTimeout(() => { if (el.isConnected) el.style.backgroundImage = img; }, ms);
       }
     }
+    // A captured piece simply stays put until the capturing piece lands on it, then it's gone (no effect).
     for (const sq of captured) {
+      const by = moves.find((m) => m.to === sq);
+      if (!by || (skip && skip.to === sq)) continue;
       const p = before[sq];
       const ghost = document.createElement('div');
       ghost.className = 'piece ghost';
       ghost.style.backgroundImage = `url(${pieceUrl(p.color, p.type)})`;
       this.squares[sq].appendChild(ghost);
-      const by = moves.find((m) => m.to === sq);
-      const delay = by && !(skip && skip.to === sq) ? 120 : 0;
-      ghost.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.5) rotate(-25deg)' }],
-        { duration: 280, delay, easing: 'ease-in', fill: 'forwards' }).onfinish = () => ghost.remove();
-      setTimeout(() => ghost.remove(), delay + 400);
-      if (by) this.pulse(sq, 'anim-capture', delay);
+      const [dx, dy] = this.offset(by.from, by.to);
+      setTimeout(() => ghost.remove(), Math.min(320, 160 + 35 * Math.hypot(dx, dy)));
     }
     for (const sq of appeared) {
       pieceEl(sq)?.animate([{ opacity: 0, transform: 'scale(0.8)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
     }
   }
 
-  /** One-off effect on a square (check, capture burst, promotion glow, checkmate). */
+  /** One-off effect on a square (check, promotion glow, checkmate). */
   pulse(sq, cls, delay = 0) {
     const run = () => {
       const fx = document.createElement('div');
