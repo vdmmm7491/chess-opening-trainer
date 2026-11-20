@@ -2,8 +2,12 @@ import { OPENINGS, LEVELS, levelForRating } from '../openings.js';
 import { mastery, dueCount, summary, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { h, esc } from '../ui.js';
 import { pieceUrl } from '../board.js';
+import { loadGames } from '../chesscom.js';
+import { suggestedOpenings, recentGames } from '../recommend.js';
+import { suggestMark } from './learn-next.js';
 
 let sideFilter = 'all';
+let suggested = null; // { user, map: Map<openingId, reason> } from What to learn next
 
 function levelBadges(o) {
   return (o.levels || []).map((k) => {
@@ -13,6 +17,7 @@ function levelBadges(o) {
 }
 
 export function render(root) {
+  let alive = true;
   const s = summary();
   const settings = getSettings();
   let level = LEVELS[settings.levelFilter] ? settings.levelFilter : 'all';
@@ -57,6 +62,7 @@ export function render(root) {
     heading.hidden = !L;
 
     grid.innerHTML = '';
+    const sugg = suggested?.user === (getSettings().chesscomUser || '').trim().toLowerCase() ? suggested.map : new Map();
     const list = OPENINGS.filter((o) =>
       (level === 'all' || (o.levels || []).includes(level)) &&
       (sideFilter === 'all' || o.side === sideFilter));
@@ -66,7 +72,7 @@ export function render(root) {
       grid.appendChild(h(`<article class="card opening-card">
         <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
           <h3>${esc(o.name)}</h3></div><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
-        <div class="lvl-row">${levelBadges(o)}</div>
+        <div class="lvl-row">${levelBadges(o)}${sugg.has(o.id) ? suggestMark(sugg.get(o.id)) : ''}</div>
         <p>${esc(o.description)}</p>
         ${o.levelNote ? `<p class="level-note">🎯 ${esc(o.levelNote)}</p>` : ''}
         <div class="kv"><span class="muted">${o.lines.length} lines · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by opening books and databases" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span><span>${m}% mastered</span></div>
@@ -105,4 +111,14 @@ export function render(root) {
     if (b) { sideFilter = b.dataset.f; draw(); }
   });
   draw();
+
+  // With a saved Chess.com username, mark the openings "What to learn next" suggests (games are cached).
+  const user = (settings.chesscomUser || '').trim().toLowerCase();
+  if (user && suggested?.user !== user) {
+    loadGames(user, 3).then((games) => {
+      suggested = { user, map: suggestedOpenings(recentGames(games), { mastery }) };
+      if (alive) draw();
+    }).catch(() => { /* offline or unknown user: just no marks */ });
+  }
+  return () => { alive = false; };
 }

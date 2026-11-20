@@ -55,3 +55,6 @@ export function learnNextCard(games) {
   card.appendChild(h(`<div>${html}</div>`));
   return card;
 }
+
+/** The quiet "Suggested" mark used on the Openings page and the Progress table. */
+export const suggestMark = (why) => `<span class="suggest-mark" title="${esc(why)}"><i></i>Suggested</span>`;

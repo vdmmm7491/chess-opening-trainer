@@ -129,3 +129,27 @@ function describe(e, lvl, mastery) {
 }
 
 export const levelName = (k) => LEVELS[k]?.name || '';
+
+/**
+ * Openings "What to learn next" points you to, with a short reason each.
+ * @returns {Map<string, string>} opening id -> reason ("You score 40% as Black vs 1.e4")
+ */
+export function suggestedOpenings(games, opts) {
+  const out = new Map();
+  for (const it of recommend(games, opts).items.slice(0, 4)) {
+    const vs = it.color === 'b' ? `as Black vs ${movesLabel(it.key)}` : `as White after ${movesLabel(it.key)}`;
+    const why = `You score ${Math.round(it.score * 100)}% ${vs}`;
+    // Only the top pick per match-up, so the marks stay few and meaningful.
+    const alt = it.alternatives[0];
+    if (it.fix) { if (!out.has(it.fix.opening.id)) out.set(it.fix.opening.id, `${why} – drill the ${it.fix.line.name} line`); }
+    else if (alt && !out.has(alt.opening.id)) out.set(alt.opening.id, `${why} – ${it.avoid ? 'sidestep it with this' : 'learn this'}`);
+  }
+  return out;
+}
+
+/** Games from the last `days` days, or all of them if that leaves fewer than `min`. */
+export function recentGames(games, days = 90, min = 20) {
+  const cut = Date.now() - days * 86400000;
+  const recent = games.filter((g) => g.end >= cut);
+  return recent.length >= min ? recent : games;
+}

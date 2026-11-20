@@ -44,6 +44,7 @@ export function recordLine(openingId, lineIdx, mistakes) {
   if (mistakes === 0) { s.perfect++; s.box = Math.min(5, s.box + 1); }
   else s.box = Math.max(0, s.box - (mistakes > 1 ? 2 : 1));
   s.last = Date.now();
+  s.first = s.first || s.last;
   s.due = Date.now() + INTERVALS[s.box] * DAY;
   state.lines[key] = s;
   const d = today();
@@ -131,6 +132,13 @@ export function startedLearning() {
     return new Date(y, m - 1, dd).getTime();
   });
   for (const e of state.history) times.push(e.t);
+  return times.length ? Math.min(...times) : null;
+}
+
+/** When you first practised this opening (ms), or null. Older saves have no `first`, so `last` and history fill in. */
+export function startedOpening(opening) {
+  const times = state.history.filter((e) => e.id === opening.id).map((e) => e.t);
+  opening.lines.forEach((_, i) => { const s = lineStats(opening.id, i); if (s) times.push(s.first || s.last); });
   return times.length ? Math.min(...times) : null;
 }
 

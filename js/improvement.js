@@ -26,6 +26,28 @@ export function trainedMatcher() {
   });
 }
 
+/**
+ * Which trainer opening a game was played in: the one whose line it follows furthest (at least
+ * 4 half-moves, your colour). Null if none, or if two openings tie (1.e4 e5 2.Nf3 Nc6 3.Nc3 could be
+ * the Italian, the Ruy or the Scotch).
+ */
+export function openingOf(g) {
+  let best = 0, hit = null, tie = false;
+  for (const o of OPENINGS) {
+    if (o.side !== g.color) continue;
+    let d = 0;
+    for (const l of o.lines) {
+      const mv = lineMoves(l);
+      let i = 0;
+      while (i < mv.length && i < g.sans.length && mv[i] === g.sans[i]) i++;
+      d = Math.max(d, i);
+    }
+    if (d > best) { best = d; hit = o; tie = false; }
+    else if (d === best && d > 0) tie = true;
+  }
+  return best >= TRAINED_PLIES && !tie ? hit : null;
+}
+
 /** Calendar bucket start for a time: Monday of the week, every other Monday, or the 1st of the month. */
 function bucketStart(t, size) {
   const d = new Date(t);
@@ -48,12 +70,13 @@ function bucketEnd(start, size) {
 /**
  * @param games parsed Chess.com games (any order)
  * @param started ms of your first trainer session (progress.startedLearning()), or null
+ * @param {object} [opts] split: false skips the "openings you trained" series (when games are already one opening)
  * @returns {{ size, buckets: [{start, end, all, trained}], before, after, beforeTrained, afterTrained, rating }}
  *   all/trained are wdl() summaries ({n, W, D, L, score}); score is null when a bucket is too small.
  */
-export function improvement(games, started) {
+export function improvement(games, started, { split = true } = {}) {
   const sorted = [...games].sort((a, b) => a.end - b.end);
-  const isTrained = trainedMatcher();
+  const isTrained = split ? trainedMatcher() : () => false;
   const span = sorted.length ? sorted[sorted.length - 1].end - sorted[0].end : 0;
   const size = span <= 12 * 7 * DAY ? 'week' : span <= 7 * 30 * DAY ? '2week' : 'month';
 

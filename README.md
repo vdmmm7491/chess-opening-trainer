@@ -23,8 +23,8 @@ A **free**, open-source website for practising chess openings. Works on phones a
 - **Board you can draw on**: right-click and drag to draw arrows (knight moves get L-shaped arrows), right-click a square to highlight it. Hold Shift, Ctrl or Alt for green, red or blue. Left-click clears them.
 - **Appearance settings** (⚙ in the top bar): 5 piece sets, 7 board colours, dark or light theme.
 - **Progress tracking**: streak, activity heatmap, mastery per opening and line, recent sessions. Export/import moves your progress between devices. With your Chess.com username it also shows:
-  - **Since you started training**: your score before and after your first session, the rating change, and a chart of your score over time (all games, and games in openings you've trained)
-  - **What to learn next**: the openings you lose to most (as Black by White's first move, as White by Black's reply), with a suggestion for each – drill the trainer line you already play, switch to a defence that suits your rating, or sidestep it with a different first move. Suggested openings are tagged in the openings table
+  - **Since you started training**: your score before and after your first session, the rating change, and a chart of your score over time (all games, and games in openings you've trained). Pick an opening tab to see the same stats and chart for just that opening, split at the day you started practising it
+  - **What to learn next**: the openings you lose to most (as Black by White's first move, as White by Black's reply), with a suggestion for each – drill the trainer line you already play, switch to a defence that suits your rating, or sidestep it with a different first move. Suggested openings get a small "Suggested" mark on the Openings page and in the Progress table
 - **Game review** (Review tab): enter a Chess.com username to download public games through Chess.com's public API (no login needed). Your username is remembered and your games load as soon as you open the tab. You get:
   - win/draw/loss by opening, as White and as Black
   - **the moves where you left your repertoire**, with a "Drill" button for that line

@@ -1,14 +1,15 @@
 import { OPENINGS, getOpening } from '../openings.js';
-import { summary, mastery, lineStats, activityDays, history, exportJson, importJson, resetAll, today, startedLearning, getSettings, setSetting } from '../progress.js';
+import { summary, mastery, lineStats, activityDays, history, exportJson, importJson, resetAll, today, startedLearning, startedOpening, getSettings, setSetting } from '../progress.js';
 import { h, esc } from '../ui.js';
 import { loadGames } from '../chesscom.js';
-import { improvement } from '../improvement.js';
-import { recommend } from '../recommend.js';
-import { learnNextCard } from './learn-next.js';
+import { improvement, openingOf } from '../improvement.js';
+import { suggestedOpenings, recentGames } from '../recommend.js';
+import { learnNextCard, suggestMark } from './learn-next.js';
 import { winrateChart } from './winrate-chart.js';
 
 const DAY = 86400000;
 const RECENT_DAYS = 90; // "What to learn next" looks at your recent games only
+let pick = 'all'; // selected opening tab, kept while the app is open
 
 export function render(root) {
   let alive = true, chart = null;
@@ -155,50 +156,77 @@ export function render(root) {
     function show() {
       const tc = $('.tc').value;
       const gs = games.filter((g) => !tc || g.timeClass === tc);
-      chart?.destroy(); chart = null;
       const out = $('.wr-out'), learn = $('.learn-out');
       out.innerHTML = ''; learn.innerHTML = '';
-      table.querySelectorAll('.tag.suggest').forEach((t) => t.remove());
+      chart?.destroy(); chart = null;
+      table.querySelectorAll('.suggest-mark').forEach((t) => t.remove());
       msg.textContent = `${gs.length} games from the last ${months} months.`;
       if (!gs.length) return;
 
-      const d = improvement(gs, started);
-      const sc = (x) => x.n ? `${Math.round(x.score * 100)}%` : '–';
-      const diff = d.before.n && d.after.n ? Math.round((d.after.score - d.before.score) * 100) : null;
-      const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
-      const r = d.rating;
-      out.appendChild(h(`<div class="stats" style="margin-top:12px">
-        <div class="card stat"><div class="n">${sc(d.before)}</div><div class="l">score before training · ${d.before.n} games</div></div>
-        <div class="card stat"><div class="n">${sc(d.after)}</div><div class="l">score since you started · ${d.after.n} games</div></div>
-        <div class="card stat"><div class="n ${diff > 0 ? 'good' : diff < 0 ? 'bad' : ''}">${diff === null ? '–' : `${signed(diff)} pts`}</div><div class="l">change in score</div></div>
-        ${r ? `<div class="card stat"><div class="n ${r.to > r.from ? 'good' : r.to < r.from ? 'bad' : ''}">${signed(r.to - r.from)}</div><div class="l">${esc(r.timeClass)} rating · ${r.from} → ${r.to}</div></div>` : ''}
-      </div>`));
-      if (started && !d.before.n) {
-        out.appendChild(h(`<p class="muted">No games before ${esc(new Date(started).toLocaleDateString())} in this period, so there's nothing to compare with yet.</p>`));
+      // Tabs: all games, then each trainer opening you've played, most games first.
+      const byOpening = new Map();
+      for (const g of gs) {
+        const o = openingOf(g);
+        if (o) byOpening.set(o.id, [...(byOpening.get(o.id) || []), g]);
       }
-      if (d.beforeTrained.n || d.afterTrained.n) {
-        out.appendChild(h(`<p class="muted" style="margin:4px 0 0">In openings you've trained: <b>${sc(d.beforeTrained)}</b> before (${d.beforeTrained.n} games) → <b>${sc(d.afterTrained)}</b> since (${d.afterTrained.n} games).</p>`));
-      }
-      chart = winrateChart(d, started);
-      out.appendChild(chart.el);
-      out.appendChild(h(`<p class="muted" style="font-size:.85rem;margin-bottom:0">Score = wins + half the draws. Periods with fewer than 3 games are left out.
-        Chess.com pairs you with players near your rating, so as your rating goes up your score drifts back towards 50% – watch the rating change too.</p>`));
+      const tabs = [...byOpening.entries()].sort((x, y) => y[1].length - x[1].length);
+      if (pick !== 'all' && !byOpening.has(pick)) pick = 'all';
+      const tabBar = h(`<div class="wr-tabs" role="tablist" aria-label="Opening">
+        <button role="tab" data-id="all">All games <span>${gs.length}</span></button>
+        ${tabs.map(([id, list]) => `<button role="tab" data-id="${id}">${esc(getOpening(id).name)} <span>${list.length}</span></button>`).join('')}
+      </div>`);
+      const body = h('<div></div>');
+      out.append(tabBar, body);
+      const select = (id) => {
+        pick = id;
+        tabBar.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.id === id)));
+        showStats(body, id === 'all' ? gs : byOpening.get(id), id === 'all' ? null : getOpening(id));
+      };
+      tabBar.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) select(b.dataset.id); });
+      select(pick);
 
       // What to learn next, from your recent games (or all of them if you've played few lately).
-      const recentCut = Date.now() - RECENT_DAYS * DAY;
-      const recent = gs.filter((g) => g.end >= recentCut);
-      const pool = recent.length >= 20 ? recent : gs;
+      const pool = recentGames(gs, RECENT_DAYS);
       learn.appendChild(learnNextCard(pool));
 
       // Mark the suggested openings in the table below.
-      const ids = new Set();
-      for (const it of recommend(pool, { mastery }).items.slice(0, 4)) {
-        if (it.fix) ids.add(it.fix.opening.id);
-        it.alternatives.forEach((a) => ids.add(a.opening.id));
+      for (const [id, why] of suggestedOpenings(pool, { mastery })) {
+        table.querySelector(`tr[data-id="${id}"] b`)?.insertAdjacentHTML('afterend', ` ${suggestMark(why)}`);
       }
-      for (const id of ids) {
-        table.querySelector(`tr[data-id="${id}"] b`)?.insertAdjacentHTML('afterend', ' <span class="tag suggest">Suggested</span>');
+    }
+
+    /** Stat tiles + chart for one tab. `o` is the trainer opening, or null for all games. */
+    function showStats(body, gs, o) {
+      chart?.destroy(); chart = null;
+      body.innerHTML = '';
+      const from = o ? startedOpening(o) : started;
+      const since = o ? 'you started this opening' : 'you started';
+      const d = improvement(gs, from, { split: !o });
+      const sc = (x) => x.n ? `${Math.round(x.score * 100)}%` : '–';
+      const diff = d.before.n && d.after.n ? Math.round((d.after.score - d.before.score) * 100) : null;
+      const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
+      const r = o ? null : d.rating;
+      const m = o ? Math.round(mastery(o) * 100) : 0;
+      body.appendChild(h(`<div class="stats" style="margin-top:12px">
+        <div class="card stat"><div class="n">${sc(d.before)}</div><div class="l">score before ${o ? 'learning it' : 'training'} · ${d.before.n} games</div></div>
+        <div class="card stat"><div class="n">${sc(d.after)}</div><div class="l">score since ${since} · ${d.after.n} games</div></div>
+        <div class="card stat"><div class="n ${diff > 0 ? 'good' : diff < 0 ? 'bad' : ''}">${diff === null ? '–' : `${signed(diff)} pts`}</div><div class="l">change in score</div></div>
+        ${r ? `<div class="card stat"><div class="n ${r.to > r.from ? 'good' : r.to < r.from ? 'bad' : ''}">${signed(r.to - r.from)}</div><div class="l">${esc(r.timeClass)} rating · ${r.from} → ${r.to}</div></div>` : ''}
+        ${o ? `<div class="card stat"><div class="n">${m}%</div><div class="l">mastered in the trainer · <a href="#/train/${o.id}?mode=practice">practise</a></div></div>` : ''}
+      </div>`));
+      if (o && !from) {
+        body.appendChild(h(`<p class="muted">You haven't practised the ${esc(o.name)} here yet, so this is your score so far. <a href="#/train/${o.id}?mode=learn">Start learning it</a>.</p>`));
+      } else if (from && !d.before.n) {
+        body.appendChild(h(`<p class="muted">No games before ${esc(new Date(from).toLocaleDateString())} in this period, so there's nothing to compare with yet.</p>`));
       }
+      if (!o && (d.beforeTrained.n || d.afterTrained.n)) {
+        body.appendChild(h(`<p class="muted" style="margin:4px 0 0">In openings you've trained: <b>${sc(d.beforeTrained)}</b> before (${d.beforeTrained.n} games) → <b>${sc(d.afterTrained)}</b> since (${d.afterTrained.n} games).</p>`));
+      }
+      chart = winrateChart(d, from, o ? { name: o.name } : {});
+      body.appendChild(chart.el);
+      body.appendChild(h(`<p class="muted" style="font-size:.85rem;margin-bottom:0">Score = wins + half the draws. Periods with fewer than 3 games are left out.
+        ${o ? 'A game counts for an opening when it follows one of its trainer lines for at least 4 half-moves.'
+          : 'Chess.com pairs you with players near your rating, so as your rating goes up your score drifts back towards 50% – watch the rating change too.'}</p>`));
     }
 
     $('.load').addEventListener('click', load);

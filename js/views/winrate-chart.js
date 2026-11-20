@@ -14,16 +14,18 @@ const pct = (s) => `${Math.round(s * 100)}%`;
 /**
  * @param data result of improvement()
  * @param started ms of the first trainer session, or null
+ * @param {object} [opts] name: label for the one series when the games are a single opening
  * @returns {{el: HTMLElement, destroy: () => void}}
  */
-export function winrateChart(data, started) {
+export function winrateChart(data, started, { name } = {}) {
   const { buckets, size } = data;
+  const SERIES_ = name ? [{ ...SERIES[0], name }] : SERIES;
   const label = (b) => size === 'month' ? fmtMonth(b.start) : `${fmtDay(b.start)} – ${fmtDay(b.end - 1)}`;
-  const series = SERIES.filter((s) => buckets.some((b) => b[s.key].score !== null));
+  const series = SERIES_.filter((s) => buckets.some((b) => b[s.key].score !== null));
 
   const el = h(`<div class="wr-chart">
     <div class="wr-legend">${series.map((s) => `<span><i style="background:${s.color}"></i>${s.name}</span>`).join('')}
-      ${started ? '<span><i class="wr-dash"></i>You started training</span>' : ''}</div>
+      ${started ? `<span><i class="wr-dash"></i>You started ${name ? 'this opening' : 'training'}</span>` : ''}</div>
     <div class="wr-plot"><div class="wr-tip" hidden></div></div>
     <details class="wr-table"><summary class="muted">Show as table</summary>
       <div class="table-wrap"><table><thead><tr><th>${size === 'month' ? 'Month' : 'Period'}</th><th>Games</th><th>W / D / L</th><th>Score</th><th>Trained openings</th></tr></thead><tbody>
@@ -60,7 +62,7 @@ export function winrateChart(data, started) {
       const anchor = sx > W - PAD.r - 60 ? 'end' : 'start';
       marker = `<rect class="wr-before" x="${PAD.l}" y="${PAD.t}" width="${Math.max(0, sx - PAD.l)}" height="${H - PAD.t - PAD.b}"/>
         <line class="wr-start" x1="${sx}" x2="${sx}" y1="${PAD.t - 6}" y2="${H - PAD.b}"/>
-        <text class="wr-axis strong" x="${sx + (anchor === 'start' ? 6 : -6)}" y="${PAD.t - 10}" text-anchor="${anchor}">Started training · ${esc(fmtDay(started))}</text>`;
+        <text class="wr-axis strong" x="${sx + (anchor === 'start' ? 6 : -6)}" y="${PAD.t - 10}" text-anchor="${anchor}">Started ${name ? 'this opening' : 'training'} · ${esc(fmtDay(started))}</text>`;
     }
 
     // One path per series, broken where a period has too few games.
@@ -82,7 +84,7 @@ export function winrateChart(data, started) {
     // Direct labels at the right edge, nudged apart so they don't overlap.
     ends.sort((a, b) => a.y - b.y);
     for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
-    const endLabels = W < NARROW ? '' : ends.map((e) => `<text class="wr-label" x="${W - PAD.r + 8}" y="${e.y + 4}">${esc(e.s.name.replace('Openings you trained', 'Trained'))} ${pct(e.v)}</text>`).join('');
+    const endLabels = W < NARROW ? '' : ends.map((e) => `<text class="wr-label" x="${W - PAD.r + 8}" y="${e.y + 4}">${esc((e.s.name === SERIES[1].name ? 'Trained' : e.s.name.length > 12 ? 'Score' : e.s.name))} ${pct(e.v)}</text>`).join('');
 
     plot.querySelector('svg')?.remove();
     svg = h(`<svg width="${W}" height="${H}" role="img" aria-label="Score per ${size === 'month' ? 'month' : 'period'} in your Chess.com games">

@@ -387,7 +387,18 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 /* Progress: win rate since you started training */
 :root { --series-1: #3b82f6; --series-2: #d9752f; }
 :root[data-theme="light"] { --series-1: #2563eb; --series-2: #c2410c; }
-.tag.suggest { background: var(--accent); color: #fff; }
+/* "Suggested" mark (Openings page, Progress table): deliberately quiet */
+.suggest-mark { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px 1px 6px; vertical-align: middle; cursor: help; white-space: nowrap; }
+.suggest-mark i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: .7; }
+.lvl-row .suggest-mark { margin-left: auto; }
+/* Opening tabs above the win-rate chart */
+.wr-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0 2px; scrollbar-width: thin; }
+.wr-tabs button { flex: none; font: inherit; font-size: .85rem; font-weight: 600; color: var(--muted); background: transparent;
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.wr-tabs button span { font-weight: 400; opacity: .8; margin-left: 2px; }
+.wr-tabs button:hover { color: var(--text); background: var(--panel-hover); }
+.wr-tabs button[aria-selected="true"] { color: var(--text); background: var(--panel-2); border-color: var(--accent); }
 .wr-chart { margin-top: 12px; }
 .wr-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
 .wr-legend span, .wr-tip div { display: inline-flex; align-items: center; gap: 6px; }
