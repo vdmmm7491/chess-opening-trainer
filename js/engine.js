@@ -10,6 +10,7 @@ export class Engine {
     this.searching = false;
     this.queue = null; // next job waiting for the current search to stop
     this.current = null;
+    this.multipv = 1;
     this.ready = new Promise((resolve) => {
       const onReady = (line) => { if (line === 'readyok') { this.listeners.delete(onReady); resolve(); } };
       this.listeners.add(onReady);
@@ -28,13 +29,14 @@ export class Engine {
 
   /**
    * Analyse a position. onInfo is called with {depth, cp, mate, pv, whiteCp} as the search deepens.
-   * Resolves with {bestmove, info} when finished.
+   * Resolves with {bestmove, info, lines} when finished; `lines[i]` is the info for the (i+1)-th best
+   * move when opts.multipv > 1 (lines[0] === info).
    * @param {string} fen
-   * @param {{depth?:number, movetime?:number, onInfo?:Function}} opts
+   * @param {{depth?:number, movetime?:number, multipv?:number, searchmoves?:string[], onInfo?:Function}} opts
    */
   analyse(fen, opts = {}) {
     return new Promise((resolve) => {
-      const job = { fen, opts, resolve, info: null, turn: fen.split(' ')[1] };
+      const job = { fen, opts, resolve, info: null, lines: [], turn: fen.split(' ')[1] };
       if (this.searching) {
         if (this.queue) this.queue.resolve({ bestmove: null, info: null, cancelled: true });
         this.queue = job;
@@ -49,8 +51,9 @@ export class Engine {
     await this.ready;
     this.current = job;
     this.searching = true;
+    const { depth, movetime, searchmoves, multipv = 1 } = job.opts;
+    if (multipv !== this.multipv) { this.send('setoption name MultiPV value ' + multipv); this.multipv = multipv; }
     this.send('position fen ' + job.fen);
-    const { depth, movetime, searchmoves } = job.opts;
     const restrict = searchmoves ? ' searchmoves ' + searchmoves.join(' ') : '';
     if (movetime) this.send('go movetime ' + movetime + restrict);
     else this.send('go depth ' + (depth || 16) + restrict);
@@ -66,15 +69,16 @@ export class Engine {
     if (!job) return;
     if (line.startsWith('info') && line.includes(' pv ') && !this.queue) {
       const info = parseInfo(line, job.turn);
-      if (info && !line.includes('multipv 2')) {
-        job.info = info;
-        job.opts.onInfo?.(info);
+      if (info) {
+        const idx = (info.multipv || 1) - 1;
+        job.lines[idx] = info;
+        if (idx === 0) { job.info = info; job.opts.onInfo?.(info); }
       }
     } else if (line.startsWith('bestmove')) {
       const bestmove = line.split(' ')[1];
       this.searching = false;
       this.current = null;
-      job.resolve({ bestmove: bestmove === '(none)' ? null : bestmove, info: job.info, cancelled: !!this.queue });
+      job.resolve({ bestmove: bestmove === '(none)' ? null : bestmove, info: job.info, lines: job.lines, cancelled: !!this.queue });
       if (this.queue) {
         const next = this.queue;
         this.queue = null;
@@ -97,7 +101,7 @@ function parseInfo(line, turn) {
   const pvIdx = t.indexOf('pv');
   const pv = pvIdx >= 0 ? t.slice(pvIdx + 1) : [];
   const sign = turn === 'w' ? 1 : -1;
-  const info = { depth, pv };
+  const info = { depth, pv, multipv: Number(get('multipv')) || 1 };
   if (kind === 'mate') {
     info.mate = val * sign; // positive = white mates
     info.whiteCp = (val > 0 ? 10000 : -10000) * sign;

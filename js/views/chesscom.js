@@ -2,7 +2,9 @@ import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck,
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
+import { CLASSES, badgeHtml, encodeClasses } from '../classify.js';
 
+const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
 
 export function render(root) {
@@ -116,7 +118,8 @@ export function render(root) {
     // ---- Engine check
     const ec = h(`<div class="card" style="margin-top:12px">
       <h2 style="margin-top:0">Stockfish opening check</h2>
-      <p class="muted" style="margin-top:0">Runs Stockfish over moves 4–12 of your most recent games and lists the moves that lost the most (in pawns).</p>
+      <p class="muted" style="margin-top:0">Runs Stockfish over the first 12 moves of your most recent games and rates each of your moves.</p>
+      <div class="class-legend" style="margin-bottom:10px">${Object.entries(CLASSES).map(([k, c]) => `<span title="${esc(c.desc)}">${badgeHtml(k, 'lg')}${c.label}</span>`).join('')}</div>
       <div class="form-row">
         <select class="input n"><option value="5">Last 5 games</option><option value="10" selected>Last 10 games</option><option value="20">Last 20 games</option></select>
         <button class="btn primary run">Run engine check</button>
@@ -137,12 +140,14 @@ export function render(root) {
     const engine = getEngine();
     const total = sel.reduce((a, g) => a + Math.max(0, Math.ceil(Math.min(g.sans.length, CHECK_PLIES) / 2) - 3), 0);
     let done = 0;
-    const found = [];
+    const found = [], perGame = [];
     try {
       for (const g of sel) {
         if (!alive) return;
-        const errs = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
-        errs.forEach((e) => found.push({ ...e, game: g }));
+        const moves = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
+        const game = { ...g, moves };
+        perGame.push(game);
+        moves.forEach((e) => found.push({ ...e, game }));
       }
     } catch (e) {
       if (!alive) return;
@@ -150,17 +155,38 @@ export function render(root) {
       btn.disabled = false; return;
     }
     btn.disabled = false; bar.hidden = true;
-    found.sort((a, b) => b.loss - a.loss);
-    if (!found.length) { out.innerHTML = '<p class="good">No significant opening mistakes found in these games. 👏</p>'; return; }
-    out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${
-      found.slice(0, 30).map((e) => `<tr>
-        <td><a href="${esc(e.game.url)}" target="_blank" rel="noopener">vs ${esc(e.game.opponent)}</a>
-          <div class="muted" style="font-size:.8rem">${esc(e.game.opening)} · ${new Date(e.game.end).toLocaleDateString()}</div></td>
-        <td class="${e.kind === 'Inaccuracy' ? 'warn' : 'bad'}">${esc(moveLabel(e.ply, e.san))}<div style="font-size:.8rem">${e.kind}</div></td>
-        <td>${(e.loss / 100).toFixed(1)}</td>
+    const order = Object.keys(CLASSES);
+    const reviewUrl = (g, at) => {
+      const keys = g.sans.map(() => null);
+      for (const m of g.moves) keys[m.ply] = m.kind;
+      return `#/analysis?moves=${encodeURIComponent(g.sans.join(' '))}&cls=${encodeClasses(keys)}&at=${at}&side=${g.color}`;
+    };
+    const counts = (moves) => order.map((k) => {
+      const n = moves.filter((m) => m.kind === k).length;
+      return n ? `<span>${badgeHtml(k, 'lg')}${n}</span>` : '';
+    }).join('');
+
+    const gameRows = perGame.map((g) => `<tr>
+      <td><a href="${esc(g.url)}" target="_blank" rel="noopener">vs ${esc(g.opponent)}</a>
+        <div class="muted" style="font-size:.8rem">${esc(g.opening)} · ${new Date(g.end).toLocaleDateString()}</div></td>
+      <td><div class="class-counts">${counts(g.moves) || '<span class="muted">–</span>'}</div></td>
+      <td><a class="btn small" href="${reviewUrl(g, Math.min(g.sans.length, CHECK_PLIES))}">Review</a></td></tr>`).join('');
+
+    // Your best finds first, then your biggest losses.
+    const finds = found.filter((e) => e.kind === 'brilliant' || e.kind === 'great');
+    const errors = found.filter((e) => ['inaccuracy', 'mistake', 'blunder'].includes(e.kind)).sort((a, b) => b.loss - a.loss);
+    const moveRow = (e) => `<tr>
+        <td>vs ${esc(e.game.opponent)}<div class="muted" style="font-size:.8rem">${esc(e.game.opening)}</div></td>
+        <td>${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}<div class="muted" style="font-size:.8rem">${CLASSES[e.kind].label}</div></td>
+        <td>${e.loss >= LOSS_SHOWN ? (e.loss / 100).toFixed(1) : ''}</td>
         <td>${esc(e.best)}</td>
-        <td><a class="btn small" href="#/analysis?moves=${encodeURIComponent(e.game.sans.slice(0, e.ply).join(' '))}">Analyse</a></td>
-      </tr>`).join('')}</tbody></table></div>`;
+        <td><a class="btn small" href="${reviewUrl(e.game, e.ply + 1)}">Analyse</a></td>
+      </tr>`;
+    const table = (rows) => `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Your moves</th><th></th></tr></thead><tbody>${gameRows}</tbody></table></div>
+      ${finds.length ? `<h3>Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
+      <h3>Biggest losses</h3>
+      ${errors.length ? table(errors.slice(0, 30).map(moveRow).join('')) : '<p class="good">No significant opening mistakes found in these games. 👏</p>'}`;
   }
 
   $('.load').addEventListener('click', load);

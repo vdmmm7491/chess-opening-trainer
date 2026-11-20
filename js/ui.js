@@ -76,11 +76,12 @@ export function pvToSan(fen, pv, max = 8) {
   return out.join(' ');
 }
 
-export function renderMoveList(el, sans, onClick, current = sans.length - 1) {
+/** `badges[i]` (optional) is HTML shown after move i, e.g. a classification badge. */
+export function renderMoveList(el, sans, onClick, current = sans.length - 1, badges = []) {
   el.innerHTML = '';
   sans.forEach((san, i) => {
     if (i % 2 === 0) el.appendChild(h(`<span class="num">${i / 2 + 1}.</span>`));
-    const s = h(`<span class="mv${i === current ? ' cur' : ''}">${esc(san)}</span>`);
+    const s = h(`<span class="mv${i === current ? ' cur' : ''}">${esc(san)}${badges[i] || ''}</span>`);
     if (onClick) s.addEventListener('click', () => onClick(i));
     el.appendChild(s);
   });

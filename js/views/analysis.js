@@ -1,6 +1,8 @@
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
-import { getSettings } from '../progress.js';import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
+import { getSettings } from '../progress.js';
+import { badgeHtml, decodeClasses } from '../classify.js';
+import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -13,7 +15,12 @@ export function render(root, { query }) {
     const c = new Chess(startFen);
     for (const s of query.moves.split(/[\s,]+/).filter(Boolean)) { try { c.move(s); sans.push(c.history().at(-1)); } catch { break; } }
   }
+  // Move classifications from the game check (one per ply); they apply while the moves still match.
+  const classes = decodeClasses(query.cls);
+  const classedSans = sans.slice();
+  const classOf = (i) => (classedSans[i] !== undefined && sans.slice(0, i + 1).every((s, k) => s === classedSans[k]) ? classes[i] : null);
   let cursor = sans.length; // number of moves applied
+  if (query.at !== undefined) cursor = Math.max(0, Math.min(sans.length, Number(query.at) || 0));
   let enginePlays = null; // 'w' | 'b' | null
   let thinking = false;
 
@@ -73,6 +80,7 @@ export function render(root, { query }) {
     },
   });
   const analyser = makeAnalyser(engine, bar, $('.engine-line'), board);
+  if (query.side === 'b') board.setOrientation('b');
 
   function rebuild() {
     chess = new Chess(startFen);
@@ -82,7 +90,10 @@ export function render(root, { query }) {
   function sync() {
     board.getDests = destsFn(chess);
     board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
-    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1);
+    const cur = cursor > 0 ? classOf(cursor - 1) : null;
+    board.setBadge(cur && lastMoveOf(chess)?.to, cur && badgeHtml(cur));
+    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1,
+      sans.map((_, i) => badgeHtml(classOf(i))));
     bar.setOrientation(board.orientation);
     bar.setVisible(getSettings().evalBar !== false);
     const showArrow = $('.arrow').checked && !enginePlays;
@@ -126,10 +137,11 @@ export function render(root, { query }) {
       case 'fwd': cursor = Math.min(sans.length, cursor + 1); break;
       case 'last': cursor = sans.length; break;
       case 'flip': board.flip(); break;
-      case 'reset': startFen = START; sans = []; cursor = 0; break;
+      case 'reset': startFen = START; sans = []; cursor = 0; classedSans.length = 0; break;
       case 'load': {
         const v = $('.fen').value.trim();
         if (!v) return;
+        classedSans.length = 0;
         try {
           new Chess(v); startFen = v; sans = []; cursor = 0;
         } catch {

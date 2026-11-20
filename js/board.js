@@ -64,6 +64,7 @@ export class Board {
     this.arrows = [];      // arrows set by the app (hints, engine)
     this.userArrows = [];  // arrows drawn by the user
     this.marks = {};       // square -> colour key, drawn by the user
+    this.badge = null;     // {sq, html}: a move-classification badge in a square's corner
     this.preview = null;   // arrow being drawn
     this.drag = null;
     this.rdrag = null;
@@ -94,7 +95,20 @@ export class Board {
     this.renderPieces();
     this.renderHighlights();
     this.renderMarks();
+    this.renderBadge();
     this.renderArrows();
+  }
+
+  /** Show `html` in the top-right corner of `sq` (null clears it). */
+  setBadge(sq, html) { this.badge = sq && html ? { sq, html } : null; this.renderBadge(); }
+
+  renderBadge() {
+    this.el.querySelector('.sq-badge')?.remove();
+    if (!this.badge) return;
+    const b = document.createElement('div');
+    b.className = 'sq-badge';
+    b.innerHTML = this.badge.html;
+    this.squares[this.badge.sq]?.appendChild(b);
   }
 
   setFen(fen, lastMove = null, checkSq = null) {
