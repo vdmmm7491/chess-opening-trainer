@@ -1,7 +1,7 @@
 // Chess.com public API helpers (no login needed – the API is public and CORS-enabled).
 // Docs: https://www.chess.com/news/view/published-data-api
 import { Chess, findBook } from './ui.js';
-import { classify, isSacrifice, NEGATIVE } from './classify.js';
+import { classify, isSacrifice, NEGATIVE, LOSS } from './classify.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 const API = 'https://api.chess.com/pub/player/';
@@ -130,13 +130,6 @@ export const CHECK_PLIES = 24;
 export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 12, onStep } = {}) {
   const c = new Chess();
   const n = Math.min(game.sans.length, maxPly);
-  const sign = game.color === 'w' ? 1 : -1;
-  const score = (info) => clamp((info?.whiteCp ?? 0) * sign);
-  const run = async (fen, opts) => {
-    const r = await engine.analyse(fen, { depth, ...opts });
-    if (r.cancelled) throw new Error('cancelled');
-    return r;
-  };
   const out = [];
   let prev = null;
   for (let ply = 0; ply < n; ply++) {
@@ -153,34 +146,66 @@ export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 
     if (ply < 6 && !inBook) continue;
     if (ply >= 6) onStep?.();
     if (inBook) { out.push({ ply, san: mv.san, loss: 0, best: '', fenBefore: fen, kind: 'theory' }); continue; }
-
-    const top = await run(fen, { multipv: 2 });
-    if (!top.bestmove) continue;
-    const playedUci = mv.from + mv.to + (mv.promotion || '');
-    const bestScore = score(top.lines[0] || top.info);
-    const isBest = top.bestmove === playedUci;
-    const playedScore = isBest ? bestScore : score((await run(fen, { searchmoves: [playedUci] })).info);
-    const s = {
-      bestScore, playedScore,
-      secondScore: isBest && top.lines[1] ? score(top.lines[1]) : null,
-      recapture: !!(mv.captured && last?.captured && last.to === mv.to),
-      sacrifice: bestScore - playedScore <= 15 && isSacrifice(fen, playedUci),
-    };
-    if (s.sacrifice) {
-      // Shallow searches over-rate sacrifices; double-check at a greater depth.
-      const deep = await run(fen, { depth: depth + 4 });
-      s.deepConfirmed = deep.bestmove === playedUci
-        || score(deep.info) - score((await run(fen, { depth: depth + 4, searchmoves: [playedUci] })).info) <= 15;
-    }
-    const kind = classify(s);
-    let bestSan = '';
-    if (!isBest && kind !== 'top') {
-      const t = new Chess(fen);
-      try { bestSan = t.move({ from: top.bestmove.slice(0, 2), to: top.bestmove.slice(2, 4), promotion: top.bestmove[4] }).san; } catch { /* */ }
-    }
-    out.push({ ply, san: mv.san, loss: Math.max(0, bestScore - playedScore), best: bestSan, fenBefore: fen, kind });
+    const r = await classifyMove(engine, fen, mv, last, { depth });
+    if (!r) continue;
+    out.push({ ply, san: mv.san, loss: r.loss, best: r.kind === 'top' ? '' : r.best, fenBefore: fen, kind: r.kind });
   }
   return out;
+}
+
+/**
+ * Classify one move with Stockfish (see engineCheck for the method).
+ * @param {string} fen position before the move
+ * @param {object} mv the chess.js move object; `last` is the move before it (for recaptures)
+ * @returns {Promise<{kind, loss, best, eval, pv}|null>} `best` is the engine's move in SAN,
+ *   `eval` the evaluation of the position before the move ({whiteCp, cp|mate, depth}), `pv` its best line (UCI).
+ *   With `verify`, a move that looks dubious or worse is searched again 6 plies deeper before it is
+ *   labelled (shallow searches sometimes miss the point of a strong move).
+ *   Throws if the search is cancelled.
+ */
+export async function classifyMove(engine, fen, mv, last, { depth = 12, verify = false } = {}) {
+  const sign = mv.color === 'w' ? 1 : -1;
+  const score = (info) => clamp((info?.whiteCp ?? 0) * sign);
+  const run = async (f, opts) => {
+    const r = await engine.analyse(f, { depth, ...opts });
+    if (r.cancelled) throw new Error('cancelled');
+    return r;
+  };
+  const top = await run(fen, { multipv: 2 });
+  if (!top.bestmove) return null;
+  const playedUci = mv.from + mv.to + (mv.promotion || '');
+  let bestScore = score(top.lines[0] || top.info);
+  let isBest = top.bestmove === playedUci;
+  let playedScore = isBest ? bestScore : score((await run(fen, { searchmoves: [playedUci] })).info);
+  if (verify && bestScore - playedScore >= LOSS.inaccuracy) {
+    const deep = await run(fen, { depth: depth + 6 });
+    const deepPlayed = deep.bestmove === playedUci ? deep : await run(fen, { depth: depth + 6, searchmoves: [playedUci] });
+    playedScore = score(deepPlayed.info);
+    bestScore = Math.max(score(deep.info), playedScore);
+    top.bestmove = deep.bestmove;
+    top.lines = [deep.info];
+    top.info = deep.info;
+    isBest = deep.bestmove === playedUci || bestScore - playedScore <= 0;
+  }
+  const s = {
+    bestScore, playedScore,
+    secondScore: isBest && top.lines[1] ? score(top.lines[1]) : null,
+    recapture: !!(mv.captured && last?.captured && last.to === mv.to),
+    sacrifice: bestScore - playedScore <= 15 && isSacrifice(fen, playedUci),
+  };
+  if (s.sacrifice) {
+    // Shallow searches over-rate sacrifices; double-check at a greater depth.
+    const deep = await run(fen, { depth: depth + 4 });
+    s.deepConfirmed = deep.bestmove === playedUci
+      || score(deep.info) - score((await run(fen, { depth: depth + 4, searchmoves: [playedUci] })).info) <= 15;
+  }
+  let best = mv.san;
+  if (!isBest) {
+    try { best = new Chess(fen).move({ from: top.bestmove.slice(0, 2), to: top.bestmove.slice(2, 4), promotion: top.bestmove[4] }).san; } catch { /* */ }
+  }
+  const info = top.lines[0] || top.info;
+  const ev = info ? { whiteCp: info.whiteCp, depth: info.depth, ...(info.mate !== undefined ? { mate: info.mate } : { cp: info.cp }) } : null;
+  return { kind: classify(s), loss: Math.max(0, bestScore - playedScore), best, eval: ev, pv: info?.pv?.slice(0, 8) || [] };
 }
 
 export function moveLabel(ply, san) {

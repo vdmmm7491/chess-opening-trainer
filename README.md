@@ -9,7 +9,7 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - **Practice** mode tests you from memory. Two wrong tries reveal the answer.
   - **Spaced repetition** brings lines you get wrong back sooner (levels 0–5).
   - **Play on vs Stockfish** lets you keep playing the position after the book ends.
-- **Famous games** tab: 10 classic games replayable move by move, with key moments explained and the Stockfish eval. Examples are Gelfand–Nakamura 2010 (King's Indian), Fischer–Spassky 1972 (Queen's Gambit, Nimzo-Indian), Deep Blue–Kasparov 1997 (Caro-Kann) and the Evergreen and Opera games. Every score is copied from a published source, linked on each game. There's also an Alien Gambit trap line, clearly marked as analysis.
+- **Famous games** tab: 10 classic games replayable move by move, with commentary on every move, a Stockfish badge on every move (rated in your browser the first time you open a game, then saved) and a game report counting each player's top moves, mistakes and blunders. Examples are Gelfand–Nakamura 2010 (King's Indian), Fischer–Spassky 1972 (Queen's Gambit, Nimzo-Indian), Deep Blue–Kasparov 1997 (Caro-Kann) and the Evergreen and Opera games. Every score is copied from a published source, linked on each game. There's also an Alien Gambit trap line, clearly marked as analysis.
 - **Alien Gambit** (Witty Alien's knight sacrifice against the Caro-Kann) as a White opening, with its main line, traps and Black's best defences.
 - **🧩 Quiz** for every opening, unlocked once you've completed 2 of its lines in Practice mode: 10 random positions from all its lines (move 3 onwards, always your move). Find the book move in one try. The coach explains the answer, and your best score is saved.
 - **Opening coach** (🎓 panel in the trainer, can be switched off):
@@ -105,7 +105,7 @@ This project is licensed under **GPL-3.0** (see `LICENSE`) because it ships Stoc
   - cburnett (the default, "Classic") by Colin M.L. Burnett and Merida by Armando Hernandez Marroquin: GPLv2+
   - Staunty, Maestro and Cardinal by sadsnake1: CC BY-NC-SA 4.0, **non-commercial only**. Remove them before adding ads, paid features or anything else commercial.
 - **Game data**: your games come from the [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api). They are downloaded in your browser and never stored on a server.
-- **Famous games**: the move scores are historical facts, checked against the source linked on each game. The descriptions and notes are written for this site.
+- **Famous games**: the move scores are historical facts, checked against the source linked on each game. The descriptions and the move-by-move commentary (`js/game-notes.js`) are written for this site, paraphrasing the games' published annotations.
 - **Opening notes**: the coach's explanations are written for this site. "Read more" links point to the original articles rather than copying them.
 - **Design**: the colours, board themes, move labels and badges are this project's own. The move symbols (`!!`, `!`, `?!`, `?`, `??`) are the traditional chess annotation marks.
 
