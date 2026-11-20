@@ -11,7 +11,7 @@ export const CLASSES = {
   only:         { label: 'Only move',    symbol: '!',  color: '#7c4dff', desc: 'The only move that keeps the position: every other move is clearly worse.' },
   top:          { label: 'Top move',     symbol: TARGET_ICON, color: '#1f8a70', desc: "Stockfish's choice, or practically as good." },
   solid:        { label: 'Solid',        symbol: '✓',  color: '#5b8a3c', desc: 'A good move, just slightly less accurate than the best one.' },
-  theory:       { label: 'Theory',       symbol: BOOK_ICON, color: '#64748b', desc: "A move from the trainer's repertoire." },
+  theory:       { label: 'Book move',    symbol: BOOK_ICON, color: '#64748b', desc: "A known opening move from the trainer's repertoire." },
   dubious:      { label: 'Dubious',      symbol: '?!', color: '#f08c00', desc: 'Gives away some of your chances (in a level position, roughly 1–2 pawns).' },
   mistake:      { label: 'Mistake',      symbol: '?',  color: '#e0531f', desc: 'Gives away a lot (in a level position, roughly 2–3.5 pawns).' },
   blunder:      { label: 'Blunder',      symbol: '??', color: '#c62828', desc: 'Throws the position away: a big swing towards your opponent.' },

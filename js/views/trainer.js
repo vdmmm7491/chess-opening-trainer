@@ -2,10 +2,11 @@ import { getOpening, lineMoves } from '../openings.js';
 import { recordLine, pickLine, lineStats, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
-import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
+import { explainMove, noteFor, analyseMistake } from '../coach.js';
+import { badgeHtml } from '../classify.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser } from '../ui.js';
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BOOK_TAG = '<span class="kind kind-book">Book move</span>';
 const moveNo = (ply, san) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
 
 export function render(root, { id, query }) {
@@ -103,9 +104,9 @@ export function render(root, { id, query }) {
     const note = noteFor([...sansBefore, san]);
     const reasons = note ? [] : explainMove(c.fen(), san, { prev }, 2);
     const label = moveNo(sansBefore.length, san);
-    const title = who === 'you' ? `✓ Why <b>${esc(label)}</b> is good`
-      : who === 'next' ? `Your move: <b>${esc(label)}</b>`
-        : `Opponent played <b>${esc(label)}</b>`;
+    const title = who === 'you' ? `${BOOK_TAG} ✓ <b>${esc(label)}</b>`
+      : who === 'next' ? `${BOOK_TAG} Your move: <b>${esc(label)}</b>`
+        : `${BOOK_TAG} Opponent played <b>${esc(label)}</b>`;
     return `<div class="coach-entry ${who}">
       <div class="coach-title">${title}</div>
       ${note ? `<p class="coach-idea">${esc(note)}</p>` : ''}
@@ -125,7 +126,9 @@ export function render(root, { id, query }) {
   function sync() {
     board.getDests = destsFn(chess);
     board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
-    renderMoveList(moveListEl, chess.history());
+    const hist = chess.history();
+    // Every move that follows the line is a book move; free play after the line gets no badge.
+    renderMoveList(moveListEl, hist, null, undefined, hist.map((_, i) => (i < moves.length ? badgeHtml('theory') : '')));
     const ply = chess.history().length;
     if (phase === 'book' && mode === 'learn' && chess.turn() === userColor && moves[ply]) showArrow(moves[ply]);
     else board.setArrows([]);
@@ -224,7 +227,7 @@ export function render(root, { id, query }) {
     }
     tries = 0;
     sync();
-    setStatus(`✓ ${esc(m.san)}: correct!`, 'good');
+    setStatus(`✓ ${esc(m.san)} ${BOOK_TAG}`, 'good');
     if (coachOn()) coachPush(explainEntry(histBefore, m.san, 'you'));
     if (chess.history().length >= moves.length) return complete();
     busy = true;
@@ -242,7 +245,17 @@ export function render(root, { id, query }) {
     }
   }
 
-  // ---------------- Mistake coaching ----------------
+  // ---------------- Mistake label ----------------
+  // A wrong move only gets a label (Blunder, Mistake, …): no explanation of why it's bad.
+  const KIND_LABEL = { Blunder: 'Blunder', Mistake: 'Mistake', Inaccuracy: 'Inaccuracy', Playable: 'Not the book move' };
+  function mistakeCard(ply, san, tag, expected) {
+    coachBody.innerHTML = `<div class="coach-entry mistake">
+      <div class="coach-title">${tag} ${esc(moveNo(ply, san))}</div>
+      <button class="btn primary retry-btn" data-coach="retry">↺ Try again</button>
+    </div>`;
+    coachBody.querySelector('[data-coach="retry"]').addEventListener('click', () => retry(expected));
+  }
+
   async function coachMistake(fenBefore, played, bookSans, expected) {
     const my = ++coachToken;
     busy = true;
@@ -253,78 +266,17 @@ export function render(root, { id, query }) {
     board.setArrows([]);
     const ply = chess.history().length;
     setStatus(`✗ ${esc(moveNo(ply, played.san))} isn't the book move.`, 'bad');
-    coachBody.innerHTML = `<div class="coach-entry mistake"><div class="coach-title">Let's look at ${esc(moveNo(ply, played.san))}…</div>
-      <p class="muted"><span class="spinner"></span> Checking what this move allows</p></div>`;
+    mistakeCard(ply, played.san, '<span class="muted"><span class="spinner"></span> Rating…</span>', expected);
 
     let res = null;
     try { res = await analyseMistake(engine, fenBefore, played.san, bookSans); } catch { res = null; }
     if (!alive || my !== coachToken) return;
     if (!res) { busy = false; wrongMoveStatus(played.san, expected); coachRender(); return; }
 
-    const bookNote = noteFor([...chess.history(), expected]);
-    const bookWhy = bookNote ? [bookNote] : explainMove(chess.fen(), expected, {}, 2);
-    const playedNote = noteFor([...chess.history(), played.san]); // in case it's a known (non-repertoire) move
-    const pawns = (res.loss / 100).toFixed(1);
-    const reply = res.steps[0];
-    const playable = res.kind === 'Playable';
-    // Always explain the book move itself: this is what the player needs to remember.
-    const bookBlock = `<div class="coach-book"><b>Why ${esc(moveNo(ply, expected))} is the book move</b>
-      ${bookWhy.map((r) => `<p>${esc(r)}</p>`).join('')}</div>`;
-    let verdict;
-    if (playable) {
-      verdict = `<p><b>${esc(played.san)}</b> is a reasonable move, but it isn't part of this repertoire. ` +
-        `Stick to the book move so you get the positions you have practised.</p>` +
-        (playedNote ? `<p class="muted">About ${esc(played.san)}: ${esc(playedNote)}</p>` : '');
-    } else {
-      verdict = `<p><b>${esc(played.san)}</b> is ${res.kind === 'Inaccuracy' ? 'an' : 'a'} <b>${res.kind.toLowerCase()}</b>, costing about <b>${pawns}</b> pawns.` +
-        (res.mateAgainst ? ' It even allows a forced checkmate!' : '') + '</p>' +
-        (reply ? `<p>Your opponent answers <b>${esc(moveNo(ply + 1, reply.san))}</b>${reply.why ? `: ${esc(reply.why.charAt(0).toLowerCase() + reply.why.slice(1))}` : '.'}</p>` : '') +
-        (res.materialChange <= -1 ? `<p>By the end of this line you are down <b>${materialWords(res.materialChange)}</b>.</p>` : '');
-    }
-    const line = res.steps.map((s, i) => {
-      const p = ply + 1 + i;
-      const label = p % 2 === 0 ? moveNo(p, s.san) : i === 0 ? moveNo(p, s.san) : s.san;
-      return `<span class="ref-mv ${s.color === res.us ? 'mine' : 'theirs'}" data-i="${i}">${esc(label)}</span>`;
-    }).join(' ');
-
-    coachBody.innerHTML = `<div class="coach-entry mistake${playable ? ' alt' : ''}">
-      <div class="coach-title"><span class="kind kind-${res.kind.toLowerCase()}">${playable ? 'Not the book move' : res.kind}</span> ${esc(moveNo(ply, played.san))}</div>
-      ${playable ? bookBlock : ''}
-      ${verdict}
-      ${res.steps.length && !playable ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
-      ${playable ? '' : bookBlock}
-      <div class="btn-row" style="margin-top:10px">
-        ${res.steps.length && !playable ? '<button class="btn small" data-coach="replay">▶ Replay</button>' : ''}
-        <button class="btn small primary" data-coach="retry">↺ Try again</button>
-      </div>
-    </div>`;
-    coachBody.querySelector('[data-coach="retry"]').addEventListener('click', () => retry(expected));
-    coachBody.querySelector('[data-coach="replay"]')?.addEventListener('click', () => playRefutation(res, played));
-    coachBody.querySelectorAll('.ref-mv').forEach((el) => el.addEventListener('click', () => showStep(res, Number(el.dataset.i))));
-    if (res.kind !== 'Playable' && res.steps.length) playRefutation(res, played);
-  }
-
-  function showStep(res, i) {
-    coachToken++;
-    const s = res.steps[i];
-    board.setFen(s.fenAfter, { from: s.from, to: s.to });
-    board.setArrows([{ from: s.from, to: s.to, color: s.color === res.us ? 'green' : 'red' }]);
-    coachBody.querySelectorAll('.ref-mv').forEach((el) => el.classList.toggle('cur', Number(el.dataset.i) === i));
-  }
-
-  async function playRefutation(res, played) {
-    const my = ++coachToken;
-    board.setFen(res.fenAfterPlayed, { from: played.from, to: played.to });
-    board.setArrows([]);
-    await sleep(700);
-    for (let i = 0; i < res.steps.length; i++) {
-      if (!alive || my !== coachToken) return;
-      const s = res.steps[i];
-      board.setFen(s.fenAfter, { from: s.from, to: s.to });
-      board.setArrows([{ from: s.from, to: s.to, color: s.color === res.us ? 'green' : 'red' }]);
-      coachBody.querySelectorAll('.ref-mv').forEach((el) => el.classList.toggle('cur', Number(el.dataset.i) === i));
-      await sleep(1100);
-    }
+    const label = KIND_LABEL[res.kind] || res.kind;
+    const tag = `<span class="kind kind-${res.kind.toLowerCase()}">${esc(label)}</span>`;
+    setStatus(`✗ ${esc(moveNo(ply, played.san))} ${tag}`, 'bad');
+    mistakeCard(ply, played.san, tag, expected);
   }
 
   function retry(expected) {

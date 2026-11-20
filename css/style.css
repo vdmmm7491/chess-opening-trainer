@@ -265,7 +265,14 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .coach-entry.mistake.alt { box-shadow: inset 3px 0 0 var(--accent); }
 .kind { display: inline-block; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; margin-right: 4px; color: #fff; }
 .kind-blunder { background: #c62828; } .kind-mistake { background: #e0531f; }
-.kind-inaccuracy { background: #f08c00; } .kind-playable { background: #64748b; }
+.kind-inaccuracy { background: #f08c00; } .kind-playable { background: #3f6fa8; }
+.kind-book { background: #64748b; }
+.status .kind, .coach-title .kind { vertical-align: 1px; }
+/* Big, easy-to-hit retry button (full width, 48px+ tall) after a wrong move. */
+.retry-btn {
+  display: block; width: 100%; min-height: 52px; margin-top: 10px;
+  font-size: 1.05rem; font-weight: 700; touch-action: manipulation;
+}
 .ref-line { margin-top: 6px; line-height: 1.9; }
 .ref-mv { padding: 2px 6px; border-radius: 5px; cursor: pointer; font-weight: 600; white-space: nowrap; }
 .ref-mv.theirs { color: var(--bad); }

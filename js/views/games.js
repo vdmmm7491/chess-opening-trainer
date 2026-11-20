@@ -155,7 +155,7 @@ function viewer(root, id) {
     let txt;
     if (NEGATIVE.includes(a.k)) txt = `Stockfish: this costs about <b>${(a.l / 100).toFixed(1)}</b> pawns. Better was <b>${esc(a.b)}</b>.`;
     else if (a.k === 'solid') txt = `Stockfish: a good move. It slightly preferred <b>${esc(a.b)}</b>.`;
-    else if (a.k === 'theory') txt = 'Opening theory: this move is in the trainer\'s repertoire.';
+    else if (a.k === 'theory') txt = 'Book move: this move is in the trainer\'s repertoire.';
     else if (a.k === 'masterstroke') txt = 'Stockfish agrees: a sound sacrifice, and the best move.';
     else if (a.k === 'only') txt = 'Stockfish: the only good move here. Everything else is clearly worse.';
     else txt = a.b === sans[ply] ? 'Stockfish\'s first choice.' : `As good as Stockfish\'s choice, ${esc(a.b)}.`;
