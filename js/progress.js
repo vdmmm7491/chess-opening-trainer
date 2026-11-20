@@ -1,5 +1,5 @@
 // Progress tracking stored in localStorage (per device).
-// Use Export / Import on the Progress page to move progress between devices.
+// Use Export / Import on the Profile page to move progress between devices.
 
 const KEY = 'opening-trainer.v1';
 const DAY = 86400000;
@@ -54,13 +54,32 @@ export function recordLine(openingId, lineIdx, mistakes) {
   return s;
 }
 
-/** 0..1 mastery for an opening (average box / 5 across its lines). */
-export function mastery(opening) {
-  const n = opening.lines.length;
-  let sum = 0;
-  opening.lines.forEach((_, i) => { sum += lineStats(opening.id, i)?.box || 0; });
-  return sum / (n * 5);
+// Share of a line's progress you get for completing it once (any mistakes);
+// the rest comes from its spaced-repetition level (box 0..5).
+const PLAYED_CREDIT = 0.2;
+
+/** 0..1 progress of one line: 0 unseen, 0.2 once completed, 1 at level 5. */
+export function lineProgress(openingId, lineIdx) {
+  const s = lineStats(openingId, lineIdx);
+  if (!s || !s.attempts) return 0;
+  return PLAYED_CREDIT + (1 - PLAYED_CREDIT) * (s.box / 5);
 }
+
+/** Progress summary for an opening: lines played, lines learned (level 3+) and overall 0..1. */
+export function openingProgress(opening) {
+  const total = opening.lines.length;
+  let played = 0, learned = 0, sum = 0;
+  opening.lines.forEach((_, i) => {
+    const s = lineStats(opening.id, i);
+    if (s?.attempts) played++;
+    if (s?.box >= 3) learned++;
+    sum += lineProgress(opening.id, i);
+  });
+  return { total, played, learned, value: total ? sum / total : 0 };
+}
+
+/** 0..1 mastery for an opening (same number the progress bars show). */
+export function mastery(opening) { return openingProgress(opening).value; }
 
 /** Pick the next line to train: unseen or due first, weakest first. */
 export function pickLine(opening, exclude = -1) {
@@ -123,6 +142,23 @@ export function recordQuiz(openingId, score, total) {
   return q;
 }
 export function quizStats(openingId) { return state.quiz?.[openingId] || null; }
+
+/** Punish mode: remember which mistakes were solved (index -> { n, clean }). */
+export function recordPunish(openingId, idx, clean) {
+  state.punish = state.punish || {};
+  const p = state.punish[openingId] || {};
+  const e = p[idx] || { n: 0, clean: false };
+  e.n++;
+  e.clean = e.clean || clean;
+  e.last = Date.now();
+  p[idx] = e;
+  state.punish[openingId] = p;
+  const d = today();
+  state.days[d] = (state.days[d] || 0) + 1;
+  save();
+  return e;
+}
+export function punishStats(openingId) { return state.punish?.[openingId] || {}; }
 
 export function activityDays() { return state.days; }
 export function history() { return state.history; }

@@ -15,6 +15,40 @@ export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+/**
+ * Opening progress bar from openingProgress(): light layer = lines played,
+ * solid layer = overall progress. Returns an HTML string.
+ */
+export function progressBar(p, { label = true } = {}) {
+  const pct = Math.round(p.value * 100);
+  const playedPct = p.total ? (p.played / p.total) * 100 : 0;
+  const tip = `${p.played}/${p.total} lines played · ${p.learned} learned (level 3+) · ${pct}% overall`;
+  return `<div class="pbar" title="${tip}">
+    ${label ? `<div class="pbar-text"><span>${p.played}/${p.total} lines played${p.learned ? ` · ${p.learned} learned` : ''}</span><b class="pbar-pct">${pct}%</b></div>` : ''}
+    <div class="bar progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${tip}">
+      <span class="played" style="width:${playedPct}%"></span><span class="fill" style="width:${pct}%"></span></div>
+  </div>`;
+}
+
+/** Update a progressBar() element in place so its widths animate. */
+export function updateProgressBar(el, p) {
+  const fresh = h(progressBar(p, { label: !!el.querySelector('.pbar-text') }));
+  const oldPct = Number(el.querySelector('[role=progressbar]').getAttribute('aria-valuenow'));
+  el.title = fresh.title;
+  const t = el.querySelector('.pbar-text');
+  if (t) t.innerHTML = fresh.querySelector('.pbar-text').innerHTML;
+  const bar = el.querySelector('[role=progressbar]'), nb = fresh.querySelector('[role=progressbar]');
+  ['aria-valuenow', 'aria-label'].forEach((a) => bar.setAttribute(a, nb.getAttribute(a)));
+  bar.querySelector('.played').style.width = nb.querySelector('.played').style.width;
+  bar.querySelector('.fill').style.width = nb.querySelector('.fill').style.width;
+  const gain = Math.round(p.value * 100) - oldPct;
+  if (gain) {
+    const pctEl = el.querySelector('.pbar-pct');
+    pctEl?.insertAdjacentHTML('beforebegin', `<span class="pbar-gain ${gain > 0 ? 'up' : 'down'}">${gain > 0 ? '+' : ''}${gain}%</span>`);
+    el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+  }
+}
+
 /** Vertical evaluation bar. */
 export class EvalBar {
   constructor() {

@@ -81,7 +81,7 @@ export class Board {
       const rank = this.orientation === 'w' ? 8 - row : row + 1;
       const sq = FILES[file] + rank;
       const div = document.createElement('div');
-      div.className = 'sq ' + ((file + rank) % 2 === 1 ? 'l' : 'd');
+      div.className = 'sq ' + ((file + rank) % 2 === 0 ? 'l' : 'd'); // a1 (file 0, rank 1) is dark
       div.dataset.sq = sq;
       if (row === 7) div.insertAdjacentHTML('beforeend', `<span class="coord file">${FILES[file]}</span>`);
       if (col === 0) div.insertAdjacentHTML('beforeend', `<span class="coord rank">${rank}</span>`);

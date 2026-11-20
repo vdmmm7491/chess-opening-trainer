@@ -16,7 +16,7 @@
 </head>
 <body>
   <h1>Opening data check</h1>
-  <p>Checks <code>js/openings.js</code>: every move is legal, ids are unique, levels are valid, and lines end on your move.
+  <p>Checks <code>js/openings.js</code> and <code>js/punish.js</code>: every move is legal, ids are unique, levels are valid, and lines end on your move.
     Open this page after adding or editing openings. <a href="../index.html">← Back to the app</a></p>
   <div id="out">Checking…</div>
   <script type="module">
@@ -29,6 +29,7 @@
     import { ROUTINE_NOTES } from '../js/notes-routine.js';
     import { ROUTINE_NOTES_BLACK } from '../js/notes-routine-black.js';
     import { THEORY } from '../js/coach.js';
+    import { PUNISH, BANDS } from '../js/punish.js';
 
     const errors = [], warnings = [];
     const ids = new Set();
@@ -96,9 +97,32 @@
     });
     if (missingNotes > 40) warnings.push(`…and ${missingNotes - 40} more moves without a coach note`);
 
+    // Punish mode: legal moves, your move after the mistake, punishment ends on your move.
+    let punishCount = 0;
+    for (const [id, entries] of Object.entries(PUNISH)) {
+      const o = OPENINGS.find((x) => x.id === id);
+      if (!o) { errors.push(`Punish entries for unknown opening <code>${id}</code>`); continue; }
+      entries.forEach((e, i) => {
+        punishCount++;
+        const pw = `<b>${o.name}</b> punish ${i + 1} (${e.name})`;
+        if (!e.name || !e.moves || !e.punish || !e.mistake || !e.why) errors.push(`${pw}: needs name, moves, punish, mistake and why`);
+        if (!BANDS.some((b) => b.min === e.elo)) errors.push(`${pw}: <code>elo</code> must be one of ${BANDS.map((b) => b.min).join(', ')}`);
+        const c = new Chess();
+        for (const s of (e.moves || '').trim().split(/\s+/)) {
+          try { c.move(s); } catch { errors.push(`${pw}: illegal move <code>${s}</code> in moves`); return; }
+        }
+        if (c.turn() !== o.side) errors.push(`${pw}: after the mistake it must be your move (${o.side === 'w' ? 'White' : 'Black'})`);
+        const p = (e.punish || '').trim().split(/\s+/);
+        for (const s of p) {
+          try { c.move(s); } catch { errors.push(`${pw}: illegal move <code>${s}</code> in punish`); return; }
+        }
+        if (p.length % 2 === 0) errors.push(`${pw}: punish must end on your move`);
+      });
+    }
+
     const list = (arr, cls) => arr.length ? `<ul>${arr.map((x) => `<li class="${cls}">${x}</li>`).join('')}</ul>` : '';
     document.getElementById('out').innerHTML =
-      `<p>${OPENINGS.length} openings, ${lineCount} lines, ${noteCount} coach notes.</p>` +
+      `<p>${OPENINGS.length} openings, ${lineCount} lines, ${noteCount} coach notes, ${punishCount} punish drills.</p>` +
       (errors.length ? `<h2 class="err">❌ ${errors.length} error(s)</h2>${list(errors, 'err')}` : '<h2 class="ok">✅ No errors</h2>') +
       (warnings.length ? `<h2 class="warn">⚠ ${warnings.length} warning(s)</h2>${list(warnings, 'warn')}` : '');
   </script>

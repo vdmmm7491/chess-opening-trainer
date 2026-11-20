@@ -1,8 +1,11 @@
 import { OPENINGS, getOpening } from '../openings.js';
-import { summary, mastery, lineStats, activityDays, history, exportJson, importJson, resetAll, today } from '../progress.js';
-import { h, esc } from '../ui.js';
+import { summary, openingProgress, lineProgress, lineStats, activityDays, history, exportJson, importJson, resetAll, today, mastery, getSettings, setSetting } from '../progress.js';
+import { h, esc, progressBar } from '../ui.js';
+import { fetchGames } from '../chesscom.js';
+import { recommend, levelName, prettyFamily } from '../recommend.js';
 
 export function render(root) {
+  let alive = true;
   const s = summary();
   root.appendChild(h(`<section>
     <h1>Your progress</h1>
@@ -13,6 +16,8 @@ export function render(root) {
       <div class="card stat"><div class="n">${s.learned}</div><div class="l">lines learned (level 3+)</div></div>
     </div>
   </section>`));
+
+  root.appendChild(learnNextSection(() => alive));
 
   // Activity heatmap – last 18 weeks
   const days = activityDays();
@@ -29,22 +34,27 @@ export function render(root) {
   act.appendChild(heat);
   root.appendChild(act);
 
-  // Per-opening table
-  const rows = OPENINGS.map((o) => {
-    const m = Math.round(mastery(o) * 100);
+  // Per-opening table: only the openings you've started (completed at least one line in Practice)
+  const started = OPENINGS.map((o) => ({ o, p: openingProgress(o) })).filter(({ p }) => p.played > 0);
+  const rows = started.map(({ o, p }) => {
     const lines = o.lines.map((l, i) => {
       const st = lineStats(o.id, i);
+      const lp = Math.round(lineProgress(o.id, i) * 100);
       const due = st && st.due > Date.now() ? `review in ${Math.ceil((st.due - Date.now()) / 86400000)}d` : '<span class="warn">due</span>';
       return `<div class="kv"><a href="#/train/${o.id}?mode=practice&line=${i}">${esc(l.name)}</a>
-        <span class="muted">${st ? `lvl ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : 'not started'}</span></div>`;
+        <span class="muted">${st ? `${lp}% · lvl ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : 'not started'}</span></div>`;
     }).join('');
     return `<tr><td><b>${esc(o.name)}</b> <span class="tag ${o.side}">${o.side === 'w' ? 'W' : 'B'}</span>
-      <div class="bar" style="margin-top:6px"><span style="width:${m}%"></span></div>
+      <div style="margin-top:6px">${progressBar(p)}</div>
       <details style="margin-top:6px"><summary class="muted">Lines</summary>${lines}</details></td>
-      <td style="width:70px">${m}%</td></tr>`;
+      <td style="width:70px">${Math.round(p.value * 100)}%</td></tr>`;
   }).join('');
-  root.appendChild(h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Openings</h2>
-    <div class="table-wrap"><table><thead><tr><th>Opening</th><th>Mastery</th></tr></thead><tbody>${rows}</tbody></table></div></div>`));
+  const table = h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Your openings</h2>
+    ${started.length
+      ? `<p class="muted" style="margin-top:0">${started.length} of ${OPENINGS.length} openings started.</p>
+        <div class="table-wrap"><table><thead><tr><th>Opening</th><th>Mastery</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<p class="muted">You haven\'t started an opening yet. Finish a line in Practice and it shows up here. <a href="#/">Pick an opening →</a></p>'}</div>`);
+  root.appendChild(table);
 
   // Recent history
   const hist = history().slice(0, 15).map((e) => {
@@ -57,7 +67,7 @@ export function render(root) {
     ${hist ? `<div class="table-wrap"><table><tbody>${hist}</tbody></table></div>` : '<p class="muted">No sessions yet – go practise an opening!</p>'}</div>`));
 
   // Backup / sync between devices
-  const backup = h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Backup &amp; move between devices</h2>
+  const backup = h(`<div class="card backup-card" style="margin-top:12px"><h2 style="margin-top:0">Backup &amp; move between devices</h2>
     <p class="muted">Progress is saved in this browser. Export it to a file and import it on your phone/computer to sync.</p>
     <div class="btn-row">
       <button class="btn small" data-act="export">⬇ Export</button>
@@ -86,4 +96,96 @@ export function render(root) {
     try { importJson(await f.text()); location.reload(); }
     catch (err) { alert('Import failed: ' + err.message); }
   });
+  return () => { alive = false; };
 }
+
+// ---- What to learn next: the openings that beat you on Chess.com, and what counters them
+const MONTHS = 3;
+
+function learnNextSection(isAlive) {
+  const sec = h(`<div class="card learn-next" style="margin-top:12px">
+    <h2 style="margin-top:0">What to learn next</h2>
+    <p class="muted" style="margin-top:0">Loads your last ${MONTHS} months of Chess.com games, finds the openings you keep losing to and suggests the trainer opening that counters each one.</p>
+    <div class="form-row">
+      <input class="input user" placeholder="Chess.com username" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px" />
+      <select class="input tc" aria-label="Time control">
+        <option value="">All time controls</option><option value="bullet">Bullet</option>
+        <option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="daily">Daily</option>
+      </select>
+      <button class="btn primary load">Find my weak spots</button>
+    </div>
+    <div class="progressbar" hidden><span></span></div>
+    <div class="msg muted" style="margin-top:8px"></div>
+    <div class="learn-out"></div>
+  </div>`);
+  const $ = (q) => sec.querySelector(q);
+  const userEl = $('.user'), msg = $('.msg'), pb = $('.progressbar'), pbFill = pb.querySelector('span'), out = $('.learn-out');
+  userEl.value = getSettings().chesscomUser || '';
+  let games = null;
+
+  async function load() {
+    const user = userEl.value.trim();
+    if (!user) { msg.textContent = 'Enter your Chess.com username first.'; return; }
+    setSetting('chesscomUser', user);
+    msg.textContent = 'Downloading games…'; out.innerHTML = '';
+    pb.hidden = false; pbFill.style.width = '0%';
+    try {
+      games = await fetchGames(user, MONTHS, (p) => { pbFill.style.width = `${Math.round(p * 100)}%`; });
+    } catch (e) {
+      if (isAlive()) { pb.hidden = true; msg.textContent = '⚠ ' + e.message; }
+      return;
+    }
+    if (!isAlive()) return;
+    pb.hidden = true;
+    show();
+  }
+
+  function show() {
+    const tc = $('.tc').value;
+    const gs = games.filter((g) => !tc || g.timeClass === tc);
+    msg.textContent = `${gs.length} games from the last ${MONTHS} months. Games come from Chess.com's public API; this site is not affiliated with Chess.com.`;
+    out.innerHTML = '';
+    if (gs.length) out.appendChild(learnNextList(gs));
+  }
+
+  $('.load').addEventListener('click', load);
+  userEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  $('.tc').addEventListener('change', () => { if (games) show(); });
+  if (userEl.value.trim()) queueMicrotask(load);
+  return sec;
+}
+
+/** The weak-spot list for a set of parsed games (exported so it can be tested with sample games). */
+export function learnNextList(games) {
+  const { level, items } = recommend(games, { mastery });
+  const wrap = h('<div></div>');
+  if (level) wrap.appendChild(h(`<p class="muted" style="margin:0 0 8px">Picked for your level: <b>${esc(levelName(level.level))}</b> (~${level.rating}).</p>`));
+  if (!items.length) {
+    wrap.appendChild(h('<p class="good">No weak spots: there is no opening you\'ve lost to twice or more while scoring under 50%. 👏</p>'));
+    return wrap;
+  }
+  const pct = (x) => Math.round(x * 100);
+  wrap.insertAdjacentHTML('beforeend', items.slice(0, 5).map((it) => {
+    const side = it.color === 'w' ? '⚪ As White' : '⚫ As Black';
+    const picks = it.picks.map((p) => {
+      const o = p.opening, m = pct(mastery(o));
+      const tag = p.kind === 'drill' ? 'Drill' : p.kind === 'avoid' ? 'Avoid it with' : 'Counter';
+      const btn = p.kind === 'drill'
+        ? `<a class="btn small primary" href="#/train/${o.id}?mode=practice&line=${p.lineIdx}">Drill this line</a>`
+        : `<a class="btn small${picksPrimary(it, p) ? ' primary' : ''}" href="#/train/${o.id}?mode=learn">${m ? `Continue (${m}%)` : 'Start learning'}</a>`;
+      return `<li><span class="tag learn-kind ${p.kind}">${tag}</span> <b>${esc(o.name)}</b>${p.kind === 'drill' ? ` <span class="muted">– ${esc(p.line.name)}</span>` : ''}
+        ${p.fits === false ? `<span class="muted" style="font-size:.8rem"> · aimed at ${esc((o.levels || []).map(levelName).join(' / '))}</span>` : ''}
+        <div class="muted learn-why">${esc(p.why)}</div>
+        <div class="learn-actions">${btn}</div></li>`;
+    }).join('') || '<li class="muted">The trainer has no opening for this yet.</li>';
+    const worst = it.lost[0];
+    return `<div class="learn-item">
+      <div class="learn-head"><b>${side} vs ${esc(prettyFamily(it.family))}</b>
+        <span class="muted">${it.n} games · ${it.W}W ${it.D}D <span class="bad">${it.L}L</span> · <span class="${pct(it.score) < 40 ? 'bad' : ''}">${pct(it.score)}%</span></span></div>
+      <ul class="learn-sugg">${picks}</ul>
+      ${worst?.url ? `<a class="muted learn-loss" href="${esc(worst.url)}" target="_blank" rel="noopener">See your latest loss on Chess.com (vs ${esc(worst.opponent)}) ↗</a>` : ''}
+    </div>`;
+  }).join(''));
+  return wrap;
+}
+const picksPrimary = (it, p) => it.picks.find((x) => x.kind !== 'drill') === p && !it.picks.some((x) => x.kind === 'drill');

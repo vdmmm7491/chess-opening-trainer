@@ -1,7 +1,8 @@
 import { OPENINGS, LEVELS, levelForRating } from '../openings.js';
-import { mastery, dueCount, summary, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
-import { h, esc } from '../ui.js';
+import { openingProgress, dueCount, summary, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
+import { PUNISH } from '../punish.js';
 
 let sideFilter = 'all';
 
@@ -61,7 +62,7 @@ export function render(root) {
       (level === 'all' || (o.levels || []).includes(level)) &&
       (sideFilter === 'all' || o.side === sideFilter));
     for (const o of list) {
-      const m = Math.round(mastery(o) * 100);
+      const p = openingProgress(o);
       const due = dueCount(o);
       grid.appendChild(h(`<article class="card opening-card">
         <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
@@ -69,14 +70,15 @@ export function render(root) {
         <div class="lvl-row">${levelBadges(o)}</div>
         <p>${esc(o.description)}</p>
         ${o.levelNote ? `<p class="level-note">🎯 ${esc(o.levelNote)}</p>` : ''}
-        <div class="kv"><span class="muted">${o.lines.length} lines · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by books and sites like Chess.com" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span><span>${m}% mastered</span></div>
-        <div class="bar"><span style="width:${m}%"></span></div>
+        <div class="kv"><span class="muted">${o.lines.length} lines · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by books and sites like Chess.com" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span></div>
+        ${progressBar(p)}
         <div class="btn-row">
           <a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>
           <a class="btn small" href="#/train/${o.id}?mode=learn">Learn</a>
           ${quizUnlocked(o)
             ? `<a class="btn small" href="#/quiz/${o.id}">🧩 Quiz</a>`
             : `<a class="btn small locked" href="#/quiz/${o.id}" title="Complete ${QUIZ_UNLOCK} lines in Practice to unlock">🔒 Quiz ${linesLearned(o)}/${QUIZ_UNLOCK}</a>`}
+          ${PUNISH[o.id]?.length ? `<a class="btn small" href="#/punish/${o.id}" title="Common opponent mistakes and how to punish them">⚔️ Punish</a>` : ''}
         </div>
       </article>`));
     }
@@ -98,6 +100,7 @@ export function render(root) {
   ratingEl.addEventListener('input', () => {
     const r = Number(ratingEl.value);
     setSetting('rating', ratingEl.value);
+    setSetting('punishBand', undefined); // Punish mode follows the new rating
     if (r >= 100) setLevel(levelForRating(r));
   });
   filters.addEventListener('click', (e) => {

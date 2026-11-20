@@ -1,9 +1,10 @@
 import { getOpening, lineMoves } from '../openings.js';
-import { recordLine, pickLine, lineStats, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
+import { PUNISH } from '../punish.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
-import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser } from '../ui.js';
+import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, progressBar, updateProgressBar } from '../ui.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const moveNo = (ply, san) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
@@ -24,10 +25,12 @@ export function render(root, { id, query }) {
       <div class="card">
         <div class="kv" style="align-items:center"><h1 style="margin:0">${esc(opening.name)}</h1>
           <span class="tag ${userColor}">You play ${userColor === 'w' ? 'White' : 'Black'}</span></div>
+        <div class="trainer-progress">${progressBar(openingProgress(opening))}</div>
         <div class="btn-row" style="margin:10px 0">
           <button class="btn small" data-mode="learn">Learn</button>
           <button class="btn small" data-mode="practice">Practice</button>
           <a class="btn small quiz-link" href="#/quiz/${opening.id}">🧩 Quiz</a>
+          ${PUNISH[opening.id]?.length ? `<a class="btn small" href="#/punish/${opening.id}">⚔️ Punish</a>` : ''}
         </div>
       </div>
       <div class="lines-backdrop"></div>
@@ -366,6 +369,10 @@ export function render(root, { id, query }) {
       const wasLocked = !quizUnlocked(opening);
       const s = recordLine(opening.id, lineIdx, mistakes);
       const justUnlocked = wasLocked && quizUnlocked(opening);
+      updateProgressBar($('.trainer-progress .pbar'), openingProgress(opening));
+      renderLineList();
+      lineInfoEl.textContent = `Line ${lineIdx + 1}/${opening.lines.length}: ${opening.lines[lineIdx].name}` +
+        ` · practised ${s.attempts}× · level ${s.box}/5`;
       setStatus(mistakes === 0
         ? `🎉 Line complete with no mistakes! (level ${s.box}/5)`
         : `Line complete with ${mistakes} mistake${mistakes > 1 ? 's' : ''}. It will come back sooner for review.`,
