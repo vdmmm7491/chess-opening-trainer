@@ -101,7 +101,7 @@ export const GAMES = [
     title: 'Alien Gambit: the "king walks forward" trap',
     white: 'Analysis', black: 'Analysis', event: 'Illustrative trap line (not a recorded game)', year: 2023, result: '1-0',
     opening: 'Caro-Kann, Alien Gambit (B15)', openingId: 'alien-gambit', analysis: true,
-    famous: 'Witty Alien\'s gambit sacrifices a knight on f7 to drag the black king out. This is the best-known trap from ramachess\'s guide. It is NOT a recorded game: I couldn\'t find a published game score by Witty Alien himself.',
+    famous: 'The Alien Gambit sacrifices a knight on f7 to drag the black king out. This is its best-known trap. It is an illustrative line, not a recorded game.',
     moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ Kg6 Ne5+ Kh7 Qd3+ g6 Qxg6#',
     source: 'https://ramachess.com/articles/alien-gambit/',
   },

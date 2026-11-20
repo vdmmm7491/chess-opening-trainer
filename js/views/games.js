@@ -84,8 +84,6 @@ function viewer(root, id) {
       <div class="card gc-report"></div>
       <div class="card">
         <p style="margin:0">${esc(g.famous)}</p>
-        <p class="muted" style="font-size:.8rem;margin:8px 0 0">Score source: <a href="${esc(g.source)}" target="_blank" rel="noopener">${esc(new URL(g.source).hostname)}</a>.
-          The commentary is written for this site from the game's published annotations; the badges and evaluations come from Stockfish running in your browser.</p>
         ${o ? `<div class="btn-row" style="margin-top:10px"><a class="btn small" href="#/train/${o.id}?mode=learn">Learn the ${esc(o.name)}</a></div>` : ''}
       </div>
     </aside>
@@ -105,6 +103,14 @@ function viewer(root, id) {
   const rec = savedAnnotation(g.id, sans);
   let annotating = !rec.done;
   const annOf = (ply) => rec.moves[ply] || null;
+  // The commentary's own annotation symbol (23...Nxg2!!, 24.dxc7?) decides the badge: a browser
+  // engine at this depth can miss the point of a famous sacrifice.
+  const MARKS = { '!!': 'masterstroke', '?!': 'dubious', '?': 'mistake', '??': 'blunder' };
+  const markOf = (ply) => {
+    const m = (notes[ply] || '').match(/^\d+\.(?:\.\.)?\s?[^\s!?:]+(!!|\?\?|\?!|!\?|!|\?)/);
+    return m && MARKS[m[1]] && m[0].includes(sans[ply].replace(/[+#]$/, '')) ? MARKS[m[1]] : null;
+  };
+  const kindOf = (ply) => markOf(ply) || annOf(ply)?.k || null;
 
   // ---------- move list ----------
   const list = $('.gmoves');
@@ -116,7 +122,7 @@ function viewer(root, id) {
     }
   }
   const cells = [...list.querySelectorAll('.gm')];
-  const paintBadge = (ply) => { const a = annOf(ply); cells[ply].querySelector('.b').innerHTML = a?.k ? badgeHtml(a.k) : ''; };
+  const paintBadge = (ply) => { const k = kindOf(ply); cells[ply].querySelector('.b').innerHTML = k ? badgeHtml(k) : ''; };
   sans.forEach((_, i) => paintBadge(i));
   list.addEventListener('click', (e) => {
     const m = e.target.closest('.gm');
@@ -134,7 +140,15 @@ function viewer(root, id) {
     return explainMove(fens[ply], sans[ply], { prev }, 2).join(' ');
   }
   function engineVerdict(ply) {
-    const a = annOf(ply);
+    const a = annOf(ply), mark = markOf(ply);
+    if (mark) {
+      const c = CLASSES[mark];
+      const txt = mark === 'masterstroke'
+        ? 'A brilliant sacrifice: it gives up material, and the attack it starts decides the game.'
+        : (a?.b && a.b !== sans[ply] ? `Better was <b>${esc(a.b)}</b>.` : esc(c.desc));
+      const btn = a?.b && a.b !== sans[ply] && mark !== 'masterstroke' ? ` <button class="btn small" data-act="better">Show ${esc(a.b)}</button>` : '';
+      return `<p class="gc-eng">${badgeHtml(mark)} <b>${c.label}.</b> ${txt}${btn}</p>`;
+    }
     if (!a) return annotating ? '<p class="muted gc-eng"><span class="spinner"></span> Stockfish hasn\'t reached this move yet…</p>' : '';
     if (!a.k) return '';
     const cls = CLASSES[a.k];
@@ -155,8 +169,8 @@ function viewer(root, id) {
     }
     const ply = cursor - 1;
     const note = notes[ply];
-    const a = annOf(ply);
-    const title = `<div class="gc-title">${a?.k ? badgeHtml(a.k, 'lg') : ''}<b>${esc(moveNo(ply))}</b><span class="muted"> · ${esc(player(ply))}</span></div>`;
+    const k = kindOf(ply);
+    const title = `<div class="gc-title">${k ? badgeHtml(k, 'lg') : ''}<b>${esc(moveNo(ply))}</b><span class="muted"> · ${esc(player(ply))}</span></div>`;
     const body = note ? `<p class="gc-note">${esc(note)}</p>` : `<p class="gc-auto">${esc(autoNote(ply))}</p>`;
     let end = '';
     if (cursor === sans.length) {
@@ -183,7 +197,7 @@ function viewer(root, id) {
       : '';
     const count = (side) => {
       const n = {};
-      rec.moves.forEach((a, i) => { if (a?.k && i % 2 === side) n[a.k] = (n[a.k] || 0) + 1; });
+      sans.forEach((_, i) => { const k = kindOf(i); if (k && i % 2 === side) n[k] = (n[k] || 0) + 1; });
       return n;
     };
     const w = count(0), b = count(1);
@@ -218,8 +232,8 @@ function viewer(root, id) {
     preview = false;
     board.setArrows([]);
     board.setFen(fens[cursor], lastMoves[cursor], checks[cursor]);
-    const a = cursor > 0 ? annOf(cursor - 1) : null;
-    board.setBadge(a?.k ? lastMoves[cursor].to : null, a?.k ? badgeHtml(a.k) : null);
+    const k = cursor > 0 ? kindOf(cursor - 1) : null;
+    board.setBadge(k ? lastMoves[cursor].to : null, k ? badgeHtml(k) : null);
     cells.forEach((el, i) => el.classList.toggle('cur', i === cursor - 1));
     const cur = cells[cursor - 1];
     list.scrollTop = cur ? cur.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2 : 0;

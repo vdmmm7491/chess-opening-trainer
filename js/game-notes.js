@@ -1,6 +1,6 @@
 // Move-by-move commentary for the famous games in games.js.
 // GAME_NOTES[gameId][ply] = comment shown after that move (ply 0 = White's first move).
-// Written for this site, paraphrasing the games' well-known published annotations (the source linked
+// Written for this site, paraphrasing the games' well-known published annotations (the score sources
 // on each game, plus the standard annotated collections). Moves without a note fall back to the
 // trainer's opening notes or the rule-based explanation in coach.js, plus Stockfish's verdict.
 
@@ -49,8 +49,8 @@ export const GAME_NOTES = {
     42: 'The bishop retreats to g1 to shield the king.',
     43: 'The knight joins the attack. It eyes g2 and f3.',
     44: 'White frees f1 for a defender. But Black has a stunning blow ready.',
-    45: '23...Nxg2!! The knight sacrifice that rips open the king. ChessBase gives it two exclamation marks.',
-    46: '24.dxc7? ChessBase says White should have taken the knight with 24.Kxg2.',
+    45: '23...Nxg2!! The knight sacrifice that rips open the king. One of the most famous moves in King\'s Indian history.',
+    46: '24.dxc7? White had to take the knight with 24.Kxg2. Now Black\'s attack crashes through.',
     47: 'Black takes the rook, winning material, and the attack goes on.',
     48: 'White recaptures, but the king is now exposed.',
     49: '...g2+! The pawn forces the king forward and opens the g-file.',
@@ -126,9 +126,9 @@ export const GAME_NOTES = {
     70: 'The bishop lines up on the b1–h7 diagonal.',
     72: 'The queen and bishop line up toward h7.',
     73: 'Black blocks with the knight.',
-    74: 'Rxf6! The final break against Black\'s king. Spassky reportedly applauded the game.',
+    74: 'Rxf6! The final break against Black\'s king. Black\'s king is stripped of its defenders.',
     76: 'The second rook takes on f6.',
-    80: 'Qf4 threatens Qxh6 and Rf8, and there is no defence. Spassky resigned, and he reportedly joined the audience in applauding the game.',
+    80: 'Qf4 threatens Qxh6 and Rf8, and there is no defence. Spassky resigned, and joined the audience in applauding the game.',
   },
 
   'spassky-fischer-1972-g5': {
@@ -229,7 +229,7 @@ export const GAME_NOTES = {
     37: 'The knight reroutes toward the kingside.',
     39: 'Black gains kingside space.',
     40: 'The queen connects the rooks.',
-    42: 'Ra3! Fischer doubles rooks on the a-file. Wikipedia says this gave White the upper hand.',
+    42: 'Ra3! Fischer doubles rooks on the a-file. From here White has the upper hand.',
     44: 'The second rook joins on the a-file.',
     45: 'Black covers the queenside.',
     46: 'White prepares to triple on the a-file.',
@@ -339,7 +339,7 @@ export const GAME_NOTES = {
     17: 'The knight kicks the queen.',
     18: 'The queen goes to c5, still in the middle of the board.',
     19: 'Black develops with a pin on the f3 knight.',
-    20: '11.Bg5? Annotators prefer 11.Be2, finishing development and castling. Now the white king stays in the centre for good.',
+    20: '11.Bg5? 11.Be2, finishing development and castling, was needed. Now the white king stays in the centre for good.',
     21: '11...Na4!! The start of the combination: if 12.Nxa4, then ...Nxe4 and White\'s position falls apart.',
     22: 'Byrne avoids the trap and moves the queen.',
     23: 'Black takes the c3 knight…',
