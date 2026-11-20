@@ -98,6 +98,7 @@ export class Board {
     this.preview = null;   // arrow being drawn
     this.drag = null;
     this.rdrag = null;
+    this.timers = new Set(); // pending animation steps
     this.build();
     this.bind();
   }
@@ -137,6 +138,7 @@ export class Board {
     this.mateSq = null;
     if (checkSq) { try { if (new Chess(fen).isCheckmate()) this.mateSq = checkSq; } catch { /* partial FEN */ } }
     this.selected = null;
+    this.stopAnimations(); // a new position cuts any running animation short: only the latest one plays
     const skip = this.skipAnim;
     this.skipAnim = null;
     this.renderPieces();
@@ -158,6 +160,21 @@ export class Board {
     }
   }
 
+  /** setTimeout that stopAnimations() can cancel. */
+  later(fn, ms) {
+    const id = setTimeout(() => { this.timers.delete(id); fn(); }, ms);
+    this.timers.add(id);
+  }
+
+  /** Jump every running animation to its end: drop leftover captured pieces, effects and pending steps. */
+  stopAnimations() {
+    this.animGen = (this.animGen || 0) + 1; // callbacks of cut-short animations see a stale number and do nothing
+    for (const id of this.timers) clearTimeout(id);
+    this.timers.clear();
+    this.el.querySelectorAll('.ghost, .sq-fx').forEach((x) => x.remove());
+    for (const a of this.el.getAnimations({ subtree: true })) if (!(a instanceof CSSAnimation)) a.finish();
+  }
+
   /** Square offset (in squares, on screen) from `to` back to `from`. */
   offset(from, to) {
     const [x1, y1] = this.sqCenter(from), [x2, y2] = this.sqCenter(to);
@@ -166,6 +183,7 @@ export class Board {
 
   animate({ moves, captured, appeared }, before, skip) {
     const pieceEl = (sq) => this.squares[sq].querySelector('.piece:not(.ghost)');
+    const gen = this.animGen;
     for (const m of moves) {
       const el = pieceEl(m.to);
       if (!el) continue;
@@ -177,14 +195,14 @@ export class Board {
         { duration: ms, easing: 'cubic-bezier(.25,.8,.35,1)' });
       a.onfinish = a.oncancel = () => {
         el.classList.remove('moving');
-        if (m.promo) this.pulse(m.to, 'anim-promo');
+        if (m.promo && gen === this.animGen) this.pulse(m.to, 'anim-promo');
       };
       if (m.promo) {
         // Slide the pawn, then swap it for the new piece.
         const img = el.style.backgroundImage;
         const p = before[m.from];
         el.style.backgroundImage = `url(${pieceUrl(p.color, p.type)})`;
-        setTimeout(() => { if (el.isConnected) el.style.backgroundImage = img; }, ms);
+        this.later(() => { if (el.isConnected) el.style.backgroundImage = img; }, ms);
       }
     }
     // A captured piece just fades out while the capturing piece slides in (no shrink, spin or burst).
@@ -197,7 +215,7 @@ export class Board {
       ghost.style.backgroundImage = `url(${pieceUrl(p.color, p.type)})`;
       this.squares[sq].appendChild(ghost);
       ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-out', fill: 'forwards' }).onfinish = () => ghost.remove();
-      setTimeout(() => ghost.remove(), 450);
+      this.later(() => ghost.remove(), 450);
     }
     for (const sq of appeared) {
       pieceEl(sq)?.animate([{ opacity: 0, transform: 'scale(0.8)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
@@ -210,9 +228,9 @@ export class Board {
       const fx = document.createElement('div');
       fx.className = 'sq-fx ' + cls;
       this.squares[sq]?.appendChild(fx);
-      setTimeout(() => fx.remove(), 1200);
+      this.later(() => fx.remove(), 1200);
     };
-    if (delay) setTimeout(run, delay); else run();
+    if (delay) this.later(run, delay); else run();
   }
 
   setOrientation(color) {
@@ -242,7 +260,7 @@ export class Board {
   }
 
   renderPieces() {
-    for (const div of Object.values(this.squares)) div.querySelector('.piece')?.remove();
+    for (const div of Object.values(this.squares)) div.querySelectorAll('.piece').forEach((x) => x.remove());
     for (const [sq, p] of Object.entries(this.pieces)) {
       const d = document.createElement('div');
       d.className = 'piece';
