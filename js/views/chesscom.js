@@ -1,8 +1,10 @@
-import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, reviewCache, reviewHref } from '../chesscom.js';
+import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, reviewCache, reviewHref, mistakesOf } from '../chesscom.js';
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
+import { CLASSES, POSITIVE, badgeHtml } from '../classify.js';
 
+const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
 let shownGames = 5; // how many recent games are expanded (kept while the tab is open)
 const FIRST_GAMES = 5, MORE_GAMES = 10;
@@ -10,9 +12,10 @@ const FIRST_GAMES = 5, MORE_GAMES = 10;
 export function render(root) {
   let alive = true;
   const view = h(`<section>
-    <h1>Chess.com opening review</h1>
+    <h1>Game review</h1>
     <p class="muted">Enter your Chess.com username. Your public games are downloaded straight from Chess.com's
-      public API (no password needed) and compared with the trainer's repertoire and Stockfish.</p>
+      public API (no password needed) and compared with the trainer's repertoire and Stockfish.
+      This site is not affiliated with Chess.com.</p>
     <div class="card">
       <div class="form-row">
         <input class="input user" placeholder="Chess.com username" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px" />
@@ -123,7 +126,8 @@ export function render(root) {
     // ---- Engine check
     const ec = h(`<div class="card" style="margin-top:12px">
       <h2 style="margin-top:0">Stockfish opening check</h2>
-      <p class="muted" style="margin-top:0">Runs Stockfish over moves 4–12 of your most recent games and lists the moves that lost the most (in pawns).</p>
+      <p class="muted" style="margin-top:0">Runs Stockfish over the first 12 moves of your most recent games and rates each of your moves.</p>
+      <div class="class-legend" style="margin-bottom:10px">${Object.entries(CLASSES).map(([k, c]) => `<span title="${esc(c.desc)}">${badgeHtml(k, 'lg')}${c.label}</span>`).join('')}</div>
       <div class="form-row">
         <select class="input n"><option value="5">Last 5 games</option><option value="10" selected>Last 10 games</option><option value="20">Last 20 games</option></select>
         <button class="btn primary run">Run engine check</button>
@@ -134,6 +138,12 @@ export function render(root) {
     results.appendChild(ec);
     ec.querySelector('.run').addEventListener('click', () => runEngine(games, ec));
   }
+
+  /** Badge + count for each class that occurs in a game's engineCheck() output. */
+  const classCounts = (moves) => Object.keys(CLASSES).map((k) => {
+    const n = moves.filter((m) => m.kind === k).length;
+    return n ? `<span>${badgeHtml(k, 'lg')}${n}</span>` : '';
+  }).join('');
 
   // ---- Recent games: a few at first, "Show more games" expands the list
   function recentGames(games, devs) {
@@ -150,11 +160,12 @@ export function render(root) {
       const errs = reviewCache.get(g.url);
       let issue;
       if (errs) {
-        const worst = errs[0];
-        issue = worst
-          ? `<span class="kind kind-${worst.kind.toLowerCase()}">${worst.kind}</span> <b>${esc(moveLabel(worst.ply, worst.san))}</b>
-             <div class="muted" style="font-size:.8rem">better: ${esc(worst.best)}${errs.length > 1 ? ` · +${errs.length - 1} more` : ''}</div>`
-          : '<span class="good">No opening mistakes</span>';
+        const bad = mistakesOf(errs), worst = bad[0];
+        issue = (worst
+          ? `<b>${esc(moveLabel(worst.ply, worst.san))}</b>${badgeHtml(worst.kind)}
+             <div class="muted" style="font-size:.8rem">${CLASSES[worst.kind].label} · better: ${esc(worst.best)}${bad.length > 1 ? ` · +${bad.length - 1} more` : ''}</div>`
+          : '<span class="good">No opening mistakes</span>')
+          + `<div class="class-counts" style="margin-top:4px">${classCounts(errs)}</div>`;
       } else if (dev) {
         issue = `<span class="bad"><b>${esc(moveLabel(dev.ply, dev.played))}</b></span>
           <div class="muted" style="font-size:.8rem">left the book (${esc(dev.expected.join(' / '))})</div>`;
@@ -202,9 +213,9 @@ export function render(root) {
     try {
       for (const g of sel) {
         if (!alive) return;
-        const errs = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
-        reviewCache.set(g.url, [...errs].sort((a, b) => b.loss - a.loss));
-        errs.forEach((e) => found.push({ ...e, game: g }));
+        const moves = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
+        reviewCache.set(g.url, moves);
+        moves.forEach((e) => found.push({ ...e, game: g }));
       }
     } catch (e) {
       if (!alive) return;
@@ -213,17 +224,21 @@ export function render(root) {
     }
     btn.disabled = false; bar.hidden = true;
     refreshRecent?.();
-    found.sort((a, b) => b.loss - a.loss);
-    if (!found.length) { out.innerHTML = '<p class="good">No significant opening mistakes found in these games. 👏</p>'; return; }
-    out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${
-      found.slice(0, 30).map((e) => `<tr>
+    // Your best finds first, then your biggest losses. Each opens the game review at that move.
+    const finds = found.filter((e) => POSITIVE.includes(e.kind));
+    const errors = mistakesOf(found);
+    const moveRow = (e) => `<tr>
         <td><a href="${esc(e.game.url)}" target="_blank" rel="noopener">vs ${esc(e.game.opponent)}</a>
           <div class="muted" style="font-size:.8rem">${esc(e.game.opening)} · ${new Date(e.game.end).toLocaleDateString()}</div></td>
-        <td class="${e.kind === 'Inaccuracy' ? 'warn' : 'bad'}">${esc(moveLabel(e.ply, e.san))}<div style="font-size:.8rem">${e.kind}</div></td>
-        <td>${(e.loss / 100).toFixed(1)}</td>
+        <td>${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}<div class="muted" style="font-size:.8rem">${CLASSES[e.kind].label}</div></td>
+        <td>${e.loss >= LOSS_SHOWN ? (e.loss / 100).toFixed(1) : ''}</td>
         <td>${esc(e.best)}</td>
         <td><a class="btn small" href="${esc(reviewHref(e.game))}&ply=${e.ply}">Analyse</a></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>`;
+    const table = (rows) => `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    out.innerHTML = `${finds.length ? `<h3 style="margin-top:0">Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
+      <h3${finds.length ? '' : ' style="margin-top:0"'}>Biggest losses</h3>
+      ${errors.length ? table(errors.slice(0, 30).map(moveRow).join('')) : '<p class="good">No significant opening mistakes found in these games. 👏</p>'}`;
   }
 
   $('.load').addEventListener('click', load);

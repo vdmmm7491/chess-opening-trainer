@@ -2,7 +2,8 @@ import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
-import { engineCheck, reviewCache, moveLabel, CHECK_PLIES } from '../chesscom.js';
+import { engineCheck, reviewCache, moveLabel, mistakesOf, CHECK_PLIES } from '../chesscom.js';
+import { CLASSES, badgeHtml } from '../classify.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -21,10 +22,14 @@ export function render(root, { query }) {
   let cursor = sans.length; // number of moves applied
   let enginePlays = null; // 'w' | 'b' | null
   let thinking = false;
-  // Game review (opened from the Chess.com tab): ?review=w|b&moves=…[&url=…&vs=…&ply=N&dev=N&book=SAN,SAN]
+  // Game review (opened from the Review tab): ?review=w|b&moves=…[&url=…&vs=…&ply=N&dev=N&book=SAN,SAN]
   const review = query.review === 'w' || query.review === 'b' ? query.review : null;
   let reviewBusy = false; // the review owns the engine; the live analyser waits
   let reviewToken = 0, animToken = 0, alive = true;
+  // Move classifications from the review (ply -> class key). They apply while the moves still match the game.
+  let classes = [];
+  const gameSans = sans.slice();
+  const classOf = (i) => (classes[i] && sans.slice(0, i + 1).every((s, k) => s === gameSans[k]) ? classes[i] : null);
 
   const view = h(`<div class="play-layout">
     <div>
@@ -97,7 +102,10 @@ export function render(root, { query }) {
   function sync() {
     board.getDests = destsFn(chess);
     board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
-    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1);
+    const cur = cursor > 0 ? classOf(cursor - 1) : null;
+    board.setBadge(cur && lastMoveOf(chess)?.to, cur && badgeHtml(cur));
+    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1,
+      sans.map((_, i) => badgeHtml(classOf(i))));
     bar.setOrientation(board.orientation);
     bar.setVisible(getSettings().evalBar !== false);
     const showArrow = $('.arrow').checked && !enginePlays;
@@ -186,8 +194,7 @@ export function render(root, { query }) {
       const total = Math.max(1, Math.ceil(Math.min(sans.length, CHECK_PLIES) / 2) - 3);
       let done = 0;
       try {
-        errs = await engineCheck(engine, { sans, color: review }, { onStep: () => { fill.style.width = `${(++done / total) * 100}%`; } });
-        errs.sort((a, b) => b.loss - a.loss);
+        errs = await engineCheck(engine, { sans: gameSans, color: review }, { onStep: () => { fill.style.width = `${(++done / total) * 100}%`; } });
         if (query.url) reviewCache.set(query.url, errs);
       } catch { errs = null; }
       if (!alive) return;
@@ -198,7 +205,9 @@ export function render(root, { query }) {
         return;
       }
     }
-    items = errs.map((e) => ({ ...e, bookSans: e.best ? [e.best] : null }));
+    classes = [];
+    for (const m of errs) classes[m.ply] = m.kind;
+    items = mistakesOf(errs).map((e) => ({ ...e, bookSans: e.best ? [e.best] : null }));
     const dev = query.dev !== undefined ? Number(query.dev) : null;
     if (dev !== null && sans[dev] && !items.some((e) => e.ply === dev)) {
       items.push({ ply: dev, san: sans[dev], kind: 'Book', bookSans: (query.book || '').split(',').filter(Boolean) });
@@ -206,7 +215,7 @@ export function render(root, { query }) {
     let target = items[0];
     if (query.ply !== undefined) {
       const p = Number(query.ply);
-      target = items.find((e) => e.ply === p) || (sans[p] ? { ply: p, san: sans[p], kind: 'Move' } : target);
+      target = items.find((e) => e.ply === p) || (sans[p] ? { ...errs.find((e) => e.ply === p), ply: p, san: sans[p], kind: 'Move', cls: classes[p] } : target);
     }
     if (!target) {
       el.innerHTML = `${title}<p class="good">No significant mistakes in your first ${CHECK_PLIES / 2} moves. 👏</p>
@@ -228,6 +237,8 @@ export function render(root, { query }) {
     el.innerHTML = `<p class="muted" style="margin:0"><span class="spinner"></span> Looking at ${esc(moveLabel(ply, played))}…</p>`;
 
     let res = null, better = item.bookSans?.length ? item.bookSans : null;
+    // The engine check already found this was (as good as) the best move: don't second-guess it.
+    if (['masterstroke', 'only', 'top'].includes(item.cls || classes[ply])) better = [played];
     try {
       if (!better) {
         const r = await engine.analyse(fenBefore, { depth: 12 });
@@ -239,17 +250,20 @@ export function render(root, { query }) {
     reviewBusy = false;
 
     const n = Math.min(items.length, 6);
-    const chips = items.length > 1 || !items.includes(item)
+    const chips = items.length && (items.length > 1 || !items.includes(item))
       ? `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
-          <div class="btn-row" style="margin-top:4px">${items.slice(0, n).map((e, i) => `<button class="btn small${e === item ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}</button>`).join('')}</div></div>`
+          <div class="btn-row" style="margin-top:4px">${items.slice(0, n).map((e, i) => `<button class="btn small${e === item ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}</button>`).join('')}</div></div>`
       : '';
     const link = query.url && /^https:\/\/(www\.)?chess\.com\//.test(query.url)
       ? `<a class="btn small" href="${esc(query.url)}" target="_blank" rel="noopener">Open on Chess.com ↗</a>` : '';
     const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
 
     if (!res) {
+      const cls = item.cls || classes[ply], c = CLASSES[cls];
+      const what = c ? ` ${badgeHtml(cls)} <b>${c.label}:</b> ${esc(c.desc)}` : '';
       el.innerHTML = `${title}<p>${better?.includes(played)
-        ? `<b>${esc(moveLabel(ply, played))}</b> is the engine's choice here. Nothing wrong with it.`
+        ? `<b>${esc(moveLabel(ply, played))}</b> is the engine's choice here.${what || ' Nothing wrong with it.'}`
+        : c ? `<b>${esc(moveLabel(ply, played))}</b>${what}`
         : `Couldn't analyse ${esc(moveLabel(ply, played))}.`}</p>${chips}<div class="btn-row" style="margin-top:10px">${link}</div>`;
       sync();
       return;
@@ -258,8 +272,11 @@ export function render(root, { query }) {
     const prefix = sans.slice(0, ply);
     const best = better[0];
     const bestWhy = noteFor([...prefix, best]) ? [noteFor([...prefix, best])] : explainMove(fenBefore, best, {}, 2);
-    const playable = res.kind === 'Playable';
+    // Moves the engine check rated (dubious / mistake / blunder) keep that label and loss here.
+    const ours = CLASSES[item.kind];
+    const playable = res.kind === 'Playable' && !ours;
     const kind = playable ? (item.kind === 'Book' ? 'Not the book move' : 'Playable') : res.kind;
+    const loss = ours && item.loss ? item.loss : res.loss;
     const reply = res.steps[0];
     let verdict;
     if (playable) {
@@ -267,7 +284,8 @@ export function render(root, { query }) {
         ? `<p><b>${esc(played)}</b> is a reasonable move, but it isn't part of your repertoire. The trainer's line continues <b>${esc(best)}</b>.</p>`
         : `<p><b>${esc(played)}</b> is fine: it costs less than a pawn compared with <b>${esc(best)}</b>.</p>`;
     } else {
-      verdict = `<p><b>${esc(played)}</b> is ${res.kind === 'Inaccuracy' ? 'an' : 'a'} <b>${res.kind.toLowerCase()}</b>, costing about <b>${(res.loss / 100).toFixed(1)}</b> pawns.` +
+      const word = ours ? ours.label.toLowerCase() + (item.kind === 'dubious' ? ' move' : '') : res.kind.toLowerCase();
+      verdict = `<p><b>${esc(played)}</b> is ${/^[aeiou]/.test(word) ? 'an' : 'a'} <b>${word}</b>, costing about <b>${(loss / 100).toFixed(1)}</b> pawns.` +
         (res.mateAgainst ? ' It even allows a forced checkmate!' : '') + '</p>' +
         (reply ? `<p>Your opponent can answer <b>${esc(moveLabel(ply + 1, reply.san))}</b>${reply.why ? `: ${esc(reply.why.charAt(0).toLowerCase() + reply.why.slice(1))}` : '.'}</p>` : '') +
         (res.materialChange <= -1 ? `<p>By the end of this line you are down <b>${materialWords(res.materialChange)}</b>.</p>` : '');
@@ -277,7 +295,7 @@ export function render(root, { query }) {
       return `<span class="ref-mv ${st.color === res.us ? 'mine' : 'theirs'}" data-i="${i}">${esc(p % 2 === 0 || i === 0 ? moveLabel(p, st.san) : st.san)}</span>`;
     }).join(' ');
     el.innerHTML = `${title}<div class="coach-entry mistake${playable ? ' alt' : ''}">
-        <div class="coach-title"><span class="kind kind-${playable ? 'playable' : res.kind.toLowerCase()}">${kind}</span> ${esc(moveLabel(ply, played))}</div>
+        <div class="coach-title">${ours && !playable ? `${badgeHtml(item.kind, 'lg')}<b>${ours.label}</b>` : `<span class="kind kind-${playable ? 'playable' : res.kind.toLowerCase()}">${kind}</span>`} ${esc(moveLabel(ply, played))}</div>
         ${verdict}
         ${res.steps.length && !playable ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
         <div class="coach-book"><b>Better was ${esc(moveLabel(ply, best))}</b>${bestWhy.map((r) => `<p>${esc(r)}</p>`).join('')}</div>
@@ -310,6 +328,7 @@ export function render(root, { query }) {
     const st = res.steps[i];
     analyser.cancel();
     board.setFen(st.fenAfter, { from: st.from, to: st.to });
+    board.setBadge(null);
     board.setArrows([{ from: st.from, to: st.to, color: st.color === res.us ? 'green' : 'red' }]);
     view.querySelectorAll('.review .ref-mv').forEach((x) => x.classList.toggle('cur', Number(x.dataset.i) === i));
   }

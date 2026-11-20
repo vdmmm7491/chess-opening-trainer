@@ -12,9 +12,9 @@ import { pieceSet, animationsOn } from './theme.js';
 const PIECE_BASE = 'assets/pieces/';
 const FILES = 'abcdefgh';
 
-// Arrow / highlight palette (similar to what players are used to on big chess sites)
-export const ARROW_COLORS = { orange: '#ffaa00', green: '#9fcf3f', red: '#f2543d', blue: '#48b4f0' };
-const MARK_COLORS = { orange: '#ffaa00', green: '#acce59', red: '#eb6150', blue: '#52b0dc' };
+// Arrow / highlight palette
+export const ARROW_COLORS = { orange: '#f39c12', green: '#3fae6a', red: '#e5484d', blue: '#3b8cf0' };
+const MARK_COLORS = { orange: '#f5a524', green: '#4cbf78', red: '#e85d61', blue: '#4f9af2' };
 
 export function pieceUrl(color, type, set = pieceSet()) {
   return `${PIECE_BASE}${set}/${color}${type.toUpperCase()}.svg`;
@@ -95,6 +95,7 @@ export class Board {
     this.arrows = [];      // arrows set by the app (hints, engine)
     this.userArrows = [];  // arrows drawn by the user
     this.marks = {};       // square -> colour key, drawn by the user
+    this.badge = null;     // {sq, html}: a move-classification badge in a square's corner
     this.preview = null;   // arrow being drawn
     this.drag = null;
     this.rdrag = null;
@@ -126,7 +127,20 @@ export class Board {
     this.renderPieces();
     this.renderHighlights();
     this.renderMarks();
+    this.renderBadge();
     this.renderArrows();
+  }
+
+  /** Show `html` in the top-right corner of `sq` (null clears it). */
+  setBadge(sq, html) { this.badge = sq && html ? { sq, html } : null; this.renderBadge(); }
+
+  renderBadge() {
+    this.el.querySelector('.sq-badge')?.remove();
+    if (!this.badge) return;
+    const b = document.createElement('div');
+    b.className = 'sq-badge';
+    b.innerHTML = this.badge.html;
+    this.squares[this.badge.sq]?.appendChild(b);
   }
 
   setFen(fen, lastMove = null, checkSq = null) {
