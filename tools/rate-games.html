@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Rate famous games</title>
+<style>body { font: 14px system-ui, sans-serif; margin: 20px; background: #16181d; color: #e6e8ee; } pre { white-space: pre-wrap; word-break: break-all; }</style>
+</head>
+<body>
+<h1>Rate famous games</h1>
+<p>Rates every move of every famous game with Stockfish (depth from <code>?depth=</code>, default 18; one game with <code>?id=</code>)
+  and prints the contents for <code>js/game-ratings.js</code>. Takes a long time: leave the tab open.</p>
+<p id="status">Starting…</p>
+<pre id="out"></pre>
+<script type="module">
+import { GAMES } from '../js/games.js';
+import { getEngine } from '../js/engine.js';
+import { annotateGame, ANNOTATE_DEPTH } from '../js/game-annotate.js';
+
+const q = new URLSearchParams(location.search);
+const depth = Number(q.get('depth')) || 18;
+const games = q.get('id') ? GAMES.filter((g) => g.id === q.get('id')) : GAMES;
+const status = document.getElementById('status');
+const result = {};
+const t0 = Date.now();
+for (const g of games) {
+  const sans = g.moves.trim().split(/\s+/);
+  const rec = { depth, key: sans.join(' '), moves: [], final: null };
+  await annotateGame(getEngine(), g.id, sans, rec, {
+    depth, save: false,
+    onMove: (ply) => { status.textContent = `${g.id}: ${ply + 1} / ${sans.length} (${Math.round((Date.now() - t0) / 1000)} s)`; },
+  });
+  // Keep the file small: a short best line is enough for the engine line under the board.
+  for (const m of rec.moves) if (m?.pv) m.pv = m.pv.slice(0, 6);
+  if (rec.final?.pv) rec.final.pv = rec.final.pv.slice(0, 6);
+  delete rec.done;
+  result[g.id] = rec;
+}
+status.textContent = `Done in ${Math.round((Date.now() - t0) / 1000)} s (fallback depth in the app: ${ANNOTATE_DEPTH}).`;
+document.getElementById('out').textContent = JSON.stringify(result);
+document.body.dataset.done = '1';
+</script>
+</body>
+</html>
