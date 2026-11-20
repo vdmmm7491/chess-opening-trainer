@@ -161,3 +161,16 @@ export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 
 export function moveLabel(ply, san) {
   return `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'} ${san}`;
 }
+
+/**
+ * Engine results per game URL, shared between the Chess.com tab and the analysis board's game review,
+ * so a game is only analysed once per visit. url -> Array<{ply, san, loss, best, kind}>
+ */
+export const reviewCache = new Map();
+
+/** Link that opens a game in the analysis board in review mode (it finds and explains your worst move). */
+export function reviewHref(game, dev) {
+  const q = new URLSearchParams({ moves: game.sans.join(' '), review: game.color, url: game.url, vs: game.opponent });
+  if (dev) { q.set('dev', dev.ply); q.set('book', dev.expected.join(',')); }
+  return '#/analysis?' + q.toString();
+}

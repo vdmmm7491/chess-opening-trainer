@@ -1,6 +1,11 @@
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
-import { getSettings } from '../progress.js';import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
+import { getSettings } from '../progress.js';
+import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
+import { engineCheck, reviewCache, moveLabel, CHECK_PLIES } from '../chesscom.js';
+import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -16,14 +21,27 @@ export function render(root, { query }) {
   let cursor = sans.length; // number of moves applied
   let enginePlays = null; // 'w' | 'b' | null
   let thinking = false;
+  // Game review (opened from the Chess.com tab): ?review=w|b&moves=…[&url=…&vs=…&ply=N&dev=N&book=SAN,SAN]
+  const review = query.review === 'w' || query.review === 'b' ? query.review : null;
+  let reviewBusy = false; // the review owns the engine; the live analyser waits
+  let reviewToken = 0, animToken = 0, alive = true;
 
   const view = h(`<div class="play-layout">
-    <div><div class="board-wrap"><div class="board"></div></div></div>
+    <div>
+      <div class="board-wrap"><div class="board"></div></div>
+      <div class="board-nav">
+        <button class="btn" data-act="first" aria-label="First move">⏮</button>
+        <button class="btn" data-act="back" aria-label="Previous move">◀</button>
+        <button class="btn" data-act="fwd" aria-label="Next move">▶</button>
+        <button class="btn" data-act="last" aria-label="Last move">⏭</button>
+      </div>
+    </div>
     <aside class="side">
       <div class="card">
         <h1 style="margin:0 0 6px">Analysis board</h1>
         <div class="muted book" style="font-size:.9rem;min-height:1.3em"></div>
       </div>
+      ${review ? '<div class="card review"></div>' : ''}
       <div class="card">
         <div class="engine-line"></div>
         <label class="toggle" style="margin-top:8px"><input type="checkbox" class="arrow" checked> Show best move arrow</label>
@@ -31,10 +49,6 @@ export function render(root, { query }) {
       <div class="card">
         <div class="movelist"></div>
         <div class="btn-row" style="margin-top:10px">
-          <button class="btn small" data-act="first">⏮</button>
-          <button class="btn small" data-act="back">◀</button>
-          <button class="btn small" data-act="fwd">▶</button>
-          <button class="btn small" data-act="last">⏭</button>
           <button class="btn small" data-act="flip">⇅ Flip</button>
           <button class="btn small" data-act="reset">New</button>
         </div>
@@ -73,6 +87,7 @@ export function render(root, { query }) {
     },
   });
   const analyser = makeAnalyser(engine, bar, $('.engine-line'), board);
+  if (review) board.setOrientation(review);
 
   function rebuild() {
     chess = new Chess(startFen);
@@ -87,7 +102,8 @@ export function render(root, { query }) {
     bar.setVisible(getSettings().evalBar !== false);
     const showArrow = $('.arrow').checked && !enginePlays;
     board.setArrows([]);
-    analyser.run(chess.fen(), { depth: 18, showArrow });
+    animToken++;
+    if (!reviewBusy) analyser.run(chess.fen(), { depth: 18, showArrow });
     const bookEl = $('.book');
     if (startFen === START && cursor > 0) {
       const b = findBook(sans.slice(0, cursor));
@@ -152,7 +168,172 @@ export function render(root, { query }) {
   };
   window.addEventListener('keydown', onKey);
 
+  // ---------------- Game review ----------------
+  const fenAt = (ply) => { const c = new Chess(startFen); for (const s of sans.slice(0, ply)) c.move(s); return c.fen(); };
+  const uciToSan = (fen, u) => { try { return new Chess(fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }).san; } catch { return ''; } };
+  let items = []; // moves worth looking at: engine mistakes + the move where you left the book
+
+  async function startReview() {
+    const el = $('.review');
+    const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+    let errs = query.url ? reviewCache.get(query.url) : null;
+    if (!errs) {
+      reviewBusy = true;
+      analyser.cancel();
+      el.innerHTML = `${title}<p class="muted"><span class="spinner"></span> Stockfish is checking your opening moves…</p>
+        <div class="progressbar"><span></span></div>`;
+      const fill = el.querySelector('.progressbar span');
+      const total = Math.max(1, Math.ceil(Math.min(sans.length, CHECK_PLIES) / 2) - 3);
+      let done = 0;
+      try {
+        errs = await engineCheck(engine, { sans, color: review }, { onStep: () => { fill.style.width = `${(++done / total) * 100}%`; } });
+        errs.sort((a, b) => b.loss - a.loss);
+        if (query.url) reviewCache.set(query.url, errs);
+      } catch { errs = null; }
+      if (!alive) return;
+      reviewBusy = false;
+      if (!errs) {
+        el.innerHTML = `${title}<p class="bad">The review was interrupted.</p><button class="btn small primary" data-rv="restart">↺ Run it again</button>`;
+        sync();
+        return;
+      }
+    }
+    items = errs.map((e) => ({ ...e, bookSans: e.best ? [e.best] : null }));
+    const dev = query.dev !== undefined ? Number(query.dev) : null;
+    if (dev !== null && sans[dev] && !items.some((e) => e.ply === dev)) {
+      items.push({ ply: dev, san: sans[dev], kind: 'Book', bookSans: (query.book || '').split(',').filter(Boolean) });
+    }
+    let target = items[0];
+    if (query.ply !== undefined) {
+      const p = Number(query.ply);
+      target = items.find((e) => e.ply === p) || (sans[p] ? { ply: p, san: sans[p], kind: 'Move' } : target);
+    }
+    if (!target) {
+      el.innerHTML = `${title}<p class="good">No significant mistakes in your first ${CHECK_PLIES / 2} moves. 👏</p>
+        <p class="muted" style="margin-bottom:0">Step through the game with ◀ ▶ to look at the rest.</p>`;
+      cursor = sans.length; rebuild(); sync();
+      return;
+    }
+    explain(target);
+  }
+
+  async function explain(item) {
+    const my = ++reviewToken;
+    const el = $('.review');
+    const ply = item.ply, played = sans[ply];
+    const fenBefore = fenAt(ply);
+    reviewBusy = true;
+    analyser.cancel();
+    cursor = ply + 1; rebuild(); sync();
+    el.innerHTML = `<p class="muted" style="margin:0"><span class="spinner"></span> Looking at ${esc(moveLabel(ply, played))}…</p>`;
+
+    let res = null, better = item.bookSans?.length ? item.bookSans : null;
+    try {
+      if (!better) {
+        const r = await engine.analyse(fenBefore, { depth: 12 });
+        if (!r.cancelled && r.bestmove) better = [uciToSan(fenBefore, r.bestmove)];
+      }
+      if (better && !better.includes(played)) res = await analyseMistake(engine, fenBefore, played, better);
+    } catch { res = null; }
+    if (!alive || my !== reviewToken) return;
+    reviewBusy = false;
+
+    const n = Math.min(items.length, 6);
+    const chips = items.length > 1 || !items.includes(item)
+      ? `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
+          <div class="btn-row" style="margin-top:4px">${items.slice(0, n).map((e, i) => `<button class="btn small${e === item ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}</button>`).join('')}</div></div>`
+      : '';
+    const link = query.url && /^https:\/\/(www\.)?chess\.com\//.test(query.url)
+      ? `<a class="btn small" href="${esc(query.url)}" target="_blank" rel="noopener">Open on Chess.com ↗</a>` : '';
+    const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+
+    if (!res) {
+      el.innerHTML = `${title}<p>${better?.includes(played)
+        ? `<b>${esc(moveLabel(ply, played))}</b> is the engine's choice here. Nothing wrong with it.`
+        : `Couldn't analyse ${esc(moveLabel(ply, played))}.`}</p>${chips}<div class="btn-row" style="margin-top:10px">${link}</div>`;
+      sync();
+      return;
+    }
+
+    const prefix = sans.slice(0, ply);
+    const best = better[0];
+    const bestWhy = noteFor([...prefix, best]) ? [noteFor([...prefix, best])] : explainMove(fenBefore, best, {}, 2);
+    const playable = res.kind === 'Playable';
+    const kind = playable ? (item.kind === 'Book' ? 'Not the book move' : 'Playable') : res.kind;
+    const reply = res.steps[0];
+    let verdict;
+    if (playable) {
+      verdict = item.kind === 'Book'
+        ? `<p><b>${esc(played)}</b> is a reasonable move, but it isn't part of your repertoire. The trainer's line continues <b>${esc(best)}</b>.</p>`
+        : `<p><b>${esc(played)}</b> is fine: it costs less than a pawn compared with <b>${esc(best)}</b>.</p>`;
+    } else {
+      verdict = `<p><b>${esc(played)}</b> is ${res.kind === 'Inaccuracy' ? 'an' : 'a'} <b>${res.kind.toLowerCase()}</b>, costing about <b>${(res.loss / 100).toFixed(1)}</b> pawns.` +
+        (res.mateAgainst ? ' It even allows a forced checkmate!' : '') + '</p>' +
+        (reply ? `<p>Your opponent can answer <b>${esc(moveLabel(ply + 1, reply.san))}</b>${reply.why ? `: ${esc(reply.why.charAt(0).toLowerCase() + reply.why.slice(1))}` : '.'}</p>` : '') +
+        (res.materialChange <= -1 ? `<p>By the end of this line you are down <b>${materialWords(res.materialChange)}</b>.</p>` : '');
+    }
+    const line = res.steps.map((st, i) => {
+      const p = ply + 1 + i;
+      return `<span class="ref-mv ${st.color === res.us ? 'mine' : 'theirs'}" data-i="${i}">${esc(p % 2 === 0 || i === 0 ? moveLabel(p, st.san) : st.san)}</span>`;
+    }).join(' ');
+    el.innerHTML = `${title}<div class="coach-entry mistake${playable ? ' alt' : ''}">
+        <div class="coach-title"><span class="kind kind-${playable ? 'playable' : res.kind.toLowerCase()}">${kind}</span> ${esc(moveLabel(ply, played))}</div>
+        ${verdict}
+        ${res.steps.length && !playable ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
+        <div class="coach-book"><b>Better was ${esc(moveLabel(ply, best))}</b>${bestWhy.map((r) => `<p>${esc(r)}</p>`).join('')}</div>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn small" data-rv="mine">Your move</button>
+        <button class="btn small" data-rv="better">Better move</button>
+        ${res.steps.length && !playable ? '<button class="btn small" data-rv="replay">▶ Replay</button>' : ''}
+        ${link}
+      </div>${chips}`;
+    el.onclick = (e) => {
+      const st = e.target.closest('.ref-mv');
+      if (st) { showStep(res, Number(st.dataset.i)); return; }
+      const b = e.target.closest('[data-rv]');
+      if (!b) return;
+      if (b.dataset.rv === 'mine') { cursor = ply + 1; rebuild(); sync(); }
+      if (b.dataset.rv === 'better') {
+        cursor = ply; rebuild(); sync();
+        const m = new Chess(fenBefore).move(best);
+        board.setArrows([{ from: m.from, to: m.to, color: 'green' }]);
+      }
+      if (b.dataset.rv === 'replay') replay(res);
+    };
+    sync();
+    if (!playable && res.steps.length) replay(res);
+  }
+
+  function showStep(res, i) {
+    animToken++;
+    const st = res.steps[i];
+    analyser.cancel();
+    board.setFen(st.fenAfter, { from: st.from, to: st.to });
+    board.setArrows([{ from: st.from, to: st.to, color: st.color === res.us ? 'green' : 'red' }]);
+    view.querySelectorAll('.review .ref-mv').forEach((x) => x.classList.toggle('cur', Number(x.dataset.i) === i));
+  }
+
+  async function replay(res) {
+    const my = ++animToken;
+    await sleep(900);
+    for (let i = 0; i < res.steps.length; i++) {
+      if (!alive || my !== animToken) return;
+      showStep(res, i);
+      animToken = my; // showStep bumps the token; keep this animation running
+      await sleep(1100);
+    }
+  }
+
+  view.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-rv]');
+    if (!b) return;
+    if (b.dataset.rv === 'restart') startReview();
+    if (b.dataset.rv === 'item') explain(items[Number(b.dataset.i)]);
+  });
+
   rebuild();
   sync();
-  return () => { window.removeEventListener('keydown', onKey); analyser.cancel(); enginePlays = null; };
+  if (review) startReview();
+  return () => { alive = false; reviewToken++; window.removeEventListener('keydown', onKey); analyser.cancel(); enginePlays = null; };
 }
