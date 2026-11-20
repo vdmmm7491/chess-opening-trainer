@@ -23,6 +23,12 @@ export function pieceSet() {
   return PIECE_SETS[s] ? s : 'staunty';
 }
 
+/** Piece animations: on unless switched off in Settings or the device asks for reduced motion. */
+export function animationsOn() {
+  if (getSettings().animations === 'off') return false;
+  return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function applyTheme() {
   const s = getSettings();
   const board = BOARD_THEMES[s.boardTheme] || BOARD_THEMES.green;
@@ -48,6 +54,9 @@ export function openSettings() {
       <label>Theme<select class="input" name="uiTheme">
         <option value="dark"${s.uiTheme !== 'light' ? ' selected' : ''}>Dark</option>
         <option value="light"${s.uiTheme === 'light' ? ' selected' : ''}>Light</option></select></label>
+      <label>Animations<select class="input" name="animations">
+        <option value="on"${s.animations !== 'off' ? ' selected' : ''}>On</option>
+        <option value="off"${s.animations === 'off' ? ' selected' : ''}>Off</option></select></label>
       <p class="muted" style="font-size:.85rem">Tip: right-click and drag on the board to draw arrows, right-click a square to highlight it.
         Hold Shift, Ctrl or Alt for other colours. Left-click clears them.</p>
       <div class="btn-row" style="justify-content:flex-end"><button class="btn primary">Done</button></div>
