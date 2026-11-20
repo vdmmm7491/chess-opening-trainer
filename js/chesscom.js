@@ -118,7 +118,7 @@ const clamp = (v) => Math.max(-1500, Math.min(1500, v));
 
 /**
  * Run Stockfish over the opening phase of a game and classify each of your moves
- * (book / best / great / brilliant / good / inaccuracy / mistake / blunder).
+ * (theory / top / only move / masterstroke / solid / dubious / mistake / blunder).
  * @returns {Promise<Array<{ply, san, loss, best, fenBefore, kind}>>} one entry per classified move;
  *   `kind` is a key of CLASSES in classify.js.
  */
@@ -152,7 +152,7 @@ export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 
     // browser engine judges offbeat but sound choices (1.b3, 1...g6) too harshly.
     if (ply < 6 && !inBook) continue;
     if (ply >= 6) onStep?.();
-    if (inBook) { out.push({ ply, san: mv.san, loss: 0, best: '', fenBefore: fen, kind: 'book' }); continue; }
+    if (inBook) { out.push({ ply, san: mv.san, loss: 0, best: '', fenBefore: fen, kind: 'theory' }); continue; }
 
     const top = await run(fen, { multipv: 2 });
     if (!top.bestmove) continue;
@@ -174,7 +174,7 @@ export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 
     }
     const kind = classify(s);
     let bestSan = '';
-    if (!isBest && kind !== 'best') {
+    if (!isBest && kind !== 'top') {
       const t = new Chess(fen);
       try { bestSan = t.move({ from: top.bestmove.slice(0, 2), to: top.bestmove.slice(2, 4), promotion: top.bestmove[4] }).san; } catch { /* */ }
     }

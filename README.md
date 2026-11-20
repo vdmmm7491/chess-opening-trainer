@@ -21,12 +21,12 @@ A **free**, open-source website for practising chess openings. Works on phones a
 - **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list.
 - **Openings by rating**: every opening is tagged with the levels it suits (Beginner under 1000, Intermediate 1000–1600, Advanced 1600–2000, Expert 2000+) and a note explaining why. Pick a level or type in your rating to filter.
 - **Board you can draw on**: right-click and drag to draw arrows (knight moves get L-shaped arrows), right-click a square to highlight it. Hold Shift, Ctrl or Alt for green, red or blue. Left-click clears them.
-- **Appearance settings** (⚙ in the top bar): 6 piece sets, 6 board colours, dark or light theme.
+- **Appearance settings** (⚙ in the top bar): 5 piece sets, 7 board colours, dark or light theme.
 - **Progress tracking**: streak, activity heatmap, mastery per opening and line, recent sessions. Export/import moves your progress between devices.
-- **Chess.com review**: enter a username to download public games through Chess.com's public API (no login needed). You get:
+- **Game review** (Review tab): enter a Chess.com username to download public games through Chess.com's public API (no login needed). You get:
   - win/draw/loss by opening, as White and as Black
   - **the moves where you left your repertoire**, with a "Drill" button for that line
-  - a **Stockfish opening check** that lists the moves that lost the most in moves 4–12 of recent games
+  - a **Stockfish opening check** that rates each of your moves in the first 12 moves of recent games, with our own labels: Masterstroke `!!`, Only move `!`, Top move, Solid, Theory, Dubious `?!`, Mistake `?` and Blunder `??`. Each game opens on the analysis board with the badges shown on the moves
 
 ## Run it locally
 
@@ -64,8 +64,9 @@ js/engine.js            Stockfish UCI wrapper (Web Worker)
 js/ui.js                Eval bar, chess helpers, book detection
 js/progress.js          localStorage progress + spaced repetition
 js/chesscom.js          Chess.com API + deviation finder + engine check
+js/classify.js          Move labels (Masterstroke … Blunder) and their badges
 js/views/*.js           One file per page
-engine/stockfish.js     Stockfish 10 (asm.js build, GPL-3.0)
+engine/stockfish.js     Stockfish 10 (asm.js build by Niklas Fiekas, GPL-3.0)
 assets/                 Icons
 tools/serve.ps1         Tiny local web server for Windows
 docs/ROADMAP.md         Ideas and next steps
@@ -95,10 +96,19 @@ After editing, open **`/tools/validate.html`** (locally or on the live site, e.g
 
 ## Credits & licence
 
-- Engine: [Stockfish](https://stockfishchess.org) (GPL-3.0), via the `stockfish.js` 10.0.2 build by nmrugg
-- Move logic: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2), loaded from jsDelivr
-- Piece sets, loaded from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md):
-  Staunty, Maestro and Cardinal by sadsnake1 (CC BY-NC-SA 4.0); Merida and cburnett (GPLv2+); Governor
-- Game data: [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api)
-
 This project is licensed under **GPL-3.0** (see `LICENSE`) because it ships Stockfish.
+
+- **Engine**: [Stockfish](https://stockfishchess.org) 10 by T. Romstad, M. Costalba, J. Kiiski, G. Linscott and contributors (GPL-3.0),
+  compiled to JavaScript by Niklas Fiekas ([stockfish.js](https://github.com/niklasf/stockfish.js), the source for `engine/stockfish.js`).
+- **Move logic**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa (BSD-2-Clause), loaded from jsDelivr.
+- **Piece sets** (shipped in `assets/pieces/`, copied from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md); details in `assets/pieces/LICENSE.md`):
+  - cburnett (the default, "Classic") by Colin M.L. Burnett and Merida by Armando Hernandez Marroquin: GPLv2+
+  - Staunty, Maestro and Cardinal by sadsnake1: CC BY-NC-SA 4.0, **non-commercial only**. Remove them before adding ads, paid features or anything else commercial.
+- **Game data**: your games come from the [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api). They are downloaded in your browser and never stored on a server.
+- **Famous games**: the move scores are historical facts, checked against the source linked on each game. The descriptions and notes are written for this site.
+- **Opening notes**: the coach's explanations are written for this site. "Read more" links point to the original articles rather than copying them.
+- **Design**: the colours, board themes, move labels and badges are this project's own. The move symbols (`!!`, `!`, `?!`, `?`, `??`) are the traditional chess annotation marks.
+
+### Trademarks
+
+Chess.com, Lichess and Stockfish are names of their respective owners. They are used here only to say where data comes from and which engine runs. This project is not affiliated with or endorsed by any of them.

@@ -21,7 +21,7 @@ export function render(root, { id }) {
     grid.appendChild(h(`<article class="card opening-card game-card">
       <div class="title"><h3>${esc(g.title)}</h3><span class="tag">${g.year}</span></div>
       <div class="muted" style="font-size:.9rem">${esc(g.white)} – ${esc(g.black)} · <b>${esc(g.result)}</b></div>
-      <div class="lvl-row"><span class="lvl" style="--lvl:#48b4f0">${esc(g.opening)}</span>${g.analysis ? '<span class="lvl" style="--lvl:#f7a440">analysis line</span>' : ''}</div>
+      <div class="lvl-row"><span class="lvl" style="--lvl:var(--accent)">${esc(g.opening)}</span>${g.analysis ? '<span class="lvl" style="--lvl:var(--warn)">analysis line</span>' : ''}</div>
       <p>${esc(g.famous)}</p>
       <div class="btn-row">
         <a class="btn primary small" href="#/games/${g.id}">▶ Replay</a>
@@ -49,7 +49,7 @@ function viewer(root, id) {
         <a href="#/games" class="muted" style="font-size:.85rem">← All famous games</a>
         <h1 style="margin:6px 0 4px">${esc(g.title)}</h1>
         <div class="muted" style="font-size:.9rem">${esc(g.white)} – ${esc(g.black)}, ${esc(g.event)} ${g.year} · <b>${esc(g.result)}</b></div>
-        <div class="lvl-row" style="margin-top:8px"><span class="lvl" style="--lvl:#48b4f0">${esc(g.opening)}</span></div>
+        <div class="lvl-row" style="margin-top:8px"><span class="lvl" style="--lvl:var(--accent)">${esc(g.opening)}</span></div>
       </div>
       <div class="card status-card">
         <div class="movelist"></div>

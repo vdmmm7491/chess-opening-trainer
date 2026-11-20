@@ -1,27 +1,30 @@
-// Move classification (brilliant / great / best / ... / blunder) and the badges that show it.
-// Symbols are the standard chess annotation marks; colours and icons are our own.
+// Move classification and the badges that show it. The names, colours and badge design are our
+// own; the symbols are the traditional chess annotation marks (!!, !, ?!, ?, ??), which nobody owns.
 import { Chess } from './ui.js';
 
 const BOOK_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 3.2C3.6 2.4 5.6 2.3 7.3 3v10c-1.7-.7-3.7-.6-5.3.2zm12 0c-1.6-.8-3.6-.9-5.3-.2v10c1.7-.7 3.7-.6 5.3.2z"/></svg>';
+const TARGET_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/></svg>';
 
-/** All classes, best first. `code` is a one-letter id used in URLs. */
+/** All classes, best first. `code` is a one-letter id used in URLs; `fg` is the symbol colour. */
 export const CLASSES = {
-  brilliant:  { code: 'r', label: 'Brilliant',  symbol: '!!', color: '#9b5de5', desc: 'A sound sacrifice: the best move, and it gives up material.' },
-  great:      { code: 'g', label: 'Great',      symbol: '!',  color: '#3a86ff', desc: 'The only move that keeps the position: every other move is clearly worse.' },
-  best:       { code: 's', label: 'Best',       symbol: '★',  color: '#2a9d8f', desc: "Stockfish's top choice, or within 0.3 pawns of it." },
-  good:       { code: 'o', label: 'Good',       symbol: '✓',  color: '#6a994e', desc: 'Close to the best move.' },
-  book:       { code: 'k', label: 'Book',       symbol: BOOK_ICON, color: '#7d8597', desc: "A move from the trainer's repertoire." },
-  inaccuracy: { code: 'i', label: 'Inaccuracy', symbol: '?!', color: '#e9a23b', desc: 'Loses a little (1.2–2.2 pawns).' },
-  mistake:    { code: 'm', label: 'Mistake',    symbol: '?',  color: '#e76f24', desc: 'Loses a lot (2.2–3.5 pawns).' },
-  blunder:    { code: 'b', label: 'Blunder',    symbol: '??', color: '#d62839', desc: 'Loses more than 3.5 pawns.' },
+  masterstroke: { code: 'r', label: 'Masterstroke', symbol: '!!', color: 'linear-gradient(135deg,#ffd76a,#e0a106)', fg: '#3a2900', desc: 'A sound sacrifice: the best move, and it gives up material.' },
+  only:         { code: 'g', label: 'Only move',    symbol: '!',  color: '#7c4dff', desc: 'The only move that keeps the position: every other move is clearly worse.' },
+  top:          { code: 's', label: 'Top move',     symbol: TARGET_ICON, color: '#1f8a70', desc: "Stockfish's choice, or within 0.3 pawns of it." },
+  solid:        { code: 'o', label: 'Solid',        symbol: '✓',  color: '#5b8a3c', desc: 'Close to the best move.' },
+  theory:       { code: 'k', label: 'Theory',       symbol: BOOK_ICON, color: '#64748b', desc: "A move from the trainer's repertoire." },
+  dubious:      { code: 'i', label: 'Dubious',      symbol: '?!', color: '#f08c00', desc: 'Loses a little (1.2–2.2 pawns).' },
+  mistake:      { code: 'm', label: 'Mistake',      symbol: '?',  color: '#e0531f', desc: 'Loses a lot (2.2–3.5 pawns).' },
+  blunder:      { code: 'b', label: 'Blunder',      symbol: '??', color: '#c62828', desc: 'Loses more than 3.5 pawns.' },
 };
+export const POSITIVE = ['masterstroke', 'only'];
+export const NEGATIVE = ['dubious', 'mistake', 'blunder'];
 const BY_CODE = Object.fromEntries(Object.entries(CLASSES).map(([k, v]) => [v.code, k]));
 
 /** Round badge for a class key. `extra` adds CSS classes (e.g. 'on-board'). */
 export function badgeHtml(key, extra = '') {
   const c = CLASSES[key];
   if (!c) return '';
-  return `<span class="mbadge ${extra}" style="--mb:${c.color}" title="${c.label}" aria-label="${c.label}">${c.symbol}</span>`;
+  return `<span class="mbadge ${extra}" style="--mb:${c.color};--mb-fg:${c.fg || '#fff'}" title="${c.label}" aria-label="${c.label}">${c.symbol}</span>`;
 }
 
 /** Encode/decode a per-ply list of class keys (null = unclassified) as a compact string for URLs. */
@@ -44,16 +47,16 @@ export function classify(s) {
   const loss = s.bestScore - s.playedScore;
   if (loss >= LOSS.blunder) return 'blunder';
   if (loss >= LOSS.mistake) return 'mistake';
-  if (loss >= LOSS.inaccuracy) return 'inaccuracy';
-  if (loss > TOP) return loss >= LOSS.good ? 'good' : 'best';
+  if (loss >= LOSS.inaccuracy) return 'dubious';
+  if (loss > TOP) return loss >= LOSS.good ? 'solid' : 'top';
   // You played the best move (or as good as). Was it special?
-  if (s.sacrifice && s.deepConfirmed && s.playedScore >= -100) return 'brilliant';
-  if (isOnlyMove(s)) return 'great';
-  return 'best';
+  if (s.sacrifice && s.deepConfirmed && s.playedScore >= -100) return 'masterstroke';
+  if (isOnlyMove(s)) return 'only';
+  return 'top';
 }
 
 /**
- * Great = the only move that keeps the position: the position after it is at least holding
+ * Only move = the only move that keeps the position: the position after it is at least holding
  * (>= 40% expected score) and the second-best move throws away 20%+ of the expected score.
  * Obvious recaptures don't count.
  */

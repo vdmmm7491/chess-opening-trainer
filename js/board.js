@@ -9,9 +9,9 @@ import { pieceSet } from './theme.js';
 const PIECE_BASE = 'assets/pieces/';
 const FILES = 'abcdefgh';
 
-// Arrow / highlight palette (similar to what players are used to on big chess sites)
-export const ARROW_COLORS = { orange: '#ffaa00', green: '#9fcf3f', red: '#f2543d', blue: '#48b4f0' };
-const MARK_COLORS = { orange: '#ffaa00', green: '#acce59', red: '#eb6150', blue: '#52b0dc' };
+// Arrow / highlight palette
+export const ARROW_COLORS = { orange: '#f39c12', green: '#3fae6a', red: '#e5484d', blue: '#3b8cf0' };
+const MARK_COLORS = { orange: '#f5a524', green: '#4cbf78', red: '#e85d61', blue: '#4f9af2' };
 
 export function pieceUrl(color, type, set = pieceSet()) {
   return `${PIECE_BASE}${set}/${color}${type.toUpperCase()}.svg`;

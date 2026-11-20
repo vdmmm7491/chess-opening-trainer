@@ -2,7 +2,7 @@ import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck,
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
-import { CLASSES, badgeHtml, encodeClasses } from '../classify.js';
+import { CLASSES, POSITIVE, NEGATIVE, badgeHtml, encodeClasses } from '../classify.js';
 
 const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
@@ -10,9 +10,10 @@ let cache = null; // { user, months, games } kept while the tab is open
 export function render(root) {
   let alive = true;
   const view = h(`<section>
-    <h1>Chess.com opening review</h1>
+    <h1>Game review</h1>
     <p class="muted">Enter your Chess.com username. Your public games are downloaded straight from Chess.com's
-      public API (no password needed) and compared with the trainer's repertoire and Stockfish.</p>
+      public API (no password needed) and compared with the trainer's repertoire and Stockfish.
+      This site is not affiliated with Chess.com.</p>
     <div class="card">
       <div class="form-row">
         <input class="input user" placeholder="Chess.com username" autocapitalize="off" autocomplete="off" spellcheck="false" style="flex:1;min-width:160px" />
@@ -173,8 +174,8 @@ export function render(root) {
       <td><a class="btn small" href="${reviewUrl(g, Math.min(g.sans.length, CHECK_PLIES))}">Review</a></td></tr>`).join('');
 
     // Your best finds first, then your biggest losses.
-    const finds = found.filter((e) => e.kind === 'brilliant' || e.kind === 'great');
-    const errors = found.filter((e) => ['inaccuracy', 'mistake', 'blunder'].includes(e.kind)).sort((a, b) => b.loss - a.loss);
+    const finds = found.filter((e) => POSITIVE.includes(e.kind));
+    const errors = found.filter((e) => NEGATIVE.includes(e.kind)).sort((a, b) => b.loss - a.loss);
     const moveRow = (e) => `<tr>
         <td>vs ${esc(e.game.opponent)}<div class="muted" style="font-size:.8rem">${esc(e.game.opening)}</div></td>
         <td>${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}<div class="muted" style="font-size:.8rem">${CLASSES[e.kind].label}</div></td>
