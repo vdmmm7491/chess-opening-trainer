@@ -1,7 +1,7 @@
 // Chess.com public API helpers (no login needed – the API is public and CORS-enabled).
 // Docs: https://www.chess.com/news/view/published-data-api
 import { Chess, findBook } from './ui.js';
-import { classify, isSacrifice, drop, DROP, NEGATIVE } from './classify.js';
+import { classify, isSacrifice, drop, DROP, NEGATIVE, accuracy } from './classify.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 const API = 'https://api.chess.com/pub/player/';
@@ -139,8 +139,10 @@ const clamp = (v) => Math.max(-1500, Math.min(1500, v));
  * @param {{sans:string[], color?:'w'|'b'|null, startFen?:string}} game  `color` = your side.
  * @param {{maxPly?:number, depth?:number, both?:boolean, onStep?:(done:number,total:number)=>void}} opts
  *   both: rate your opponent's moves too (always the case when game.color is not set).
- * @returns {Promise<Array<{ply, san, loss, drop, best, fenBefore, kind, mine}>>} one entry per rated move,
- *   in order; `kind` is a key of CLASSES in classify.js, `loss` is in centipawns.
+ * @returns {Promise<Array<{ply, san, loss, drop, best, fenBefore, kind, mine, wv?, wvEnd?}>>} one entry per
+ *   rated move, in order; `kind` is a key of CLASSES in classify.js, `loss` is in centipawns, `wv` the
+ *   evaluation of the position before the move (White's view, centipawns) when it was searched. When
+ *   both sides are rated, the last entry also has `wvEnd`, the evaluation of the final position.
  *
  * Speed: each position is searched once (with the two best lines). The played move's score comes
  * from that search when it was one of those two lines, otherwise from the search of the next
@@ -148,8 +150,6 @@ const clamp = (v) => Math.max(-1500, Math.min(1500, v));
  * deeper search of the played move from the same position to confirm it, as comparing two searches
  * from the same root is more stable than comparing consecutive positions.
  */
-export const CHECK_PLIES = 30; // the Review tab's bulk check: the first 15 moves of each game
-
 export async function engineCheck(engine, game, { maxPly = Infinity, depth = 12, both = false, onStep } = {}) {
   const startFen = game.startFen || START_FEN;
   const c = new Chess(startFen);
@@ -236,8 +236,10 @@ export async function engineCheck(engine, game, { maxPly = Infinity, depth = 12,
     if (!isBest && kind !== 'top') {
       try { entry.best = new Chess(fen).move({ from: e.bestmove.slice(0, 2), to: e.bestmove.slice(2, 4), promotion: e.bestmove[4] }).san; } catch { /* */ }
     }
-    out.push({ ...entry, kind, loss: Math.max(0, bestScore - playedScore), drop: drop(bestScore, playedScore) });
+    out.push({ ...entry, kind, wv: e.wv, loss: Math.max(0, bestScore - playedScore), drop: drop(bestScore, playedScore) });
   }
+  // The final position too, for the evaluation graph of a whole-game review.
+  if (rateAll && out.length && n === game.sans.length) out.at(-1).wvEnd = (await evalAt(n)).wv;
   onStep?.(plies.length, plies.length);
   return out;
 }
@@ -303,22 +305,20 @@ export function moveLabel(ply, san) {
 }
 
 /**
- * Finished reviews per game URL, shared between the Review tab and the analysis board, and kept in
- * this browser (localStorage) so a game is analysed only once. `full` = the whole game, both sides
- * (the analysis board's review); otherwise only your moves in the first CHECK_PLIES (the bulk check).
+ * Finished whole-game reviews (both sides) per game URL, shared between the Review tab and the game
+ * analysis page, and kept in this browser (localStorage) so a game is analysed only once.
+ * v3: entries carry evaluations (`wv`, `wvEnd`) for the evaluation graph.
  */
-const REVIEW_KEY = 'opening-trainer.reviews.v2', MAX_REVIEWS = 40;
+const REVIEW_KEY = 'opening-trainer.reviews.v3', MAX_REVIEWS = 60;
 const reviews = (() => { try { return new Map(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Map(); } })();
 
 /** @returns {{moves:Array, full:boolean}|null} */
 export const getReview = (url) => (url && reviews.get(url)) || null;
 
-export function saveReview(url, moves, full) {
+export function saveReview(url, moves) {
   if (!url) return;
-  const old = reviews.get(url);
-  if (old?.full && !full) return; // never replace a full review with a partial one
   reviews.delete(url);
-  reviews.set(url, { moves: moves.map(({ fenBefore, ...m }) => m), full });
+  reviews.set(url, { moves: moves.map(({ fenBefore, ...m }) => m), full: true });
   while (reviews.size > MAX_REVIEWS) reviews.delete(reviews.keys().next().value);
   try { localStorage.setItem(REVIEW_KEY, JSON.stringify([...reviews])); } catch { /* storage full or blocked */ }
 }
@@ -326,7 +326,10 @@ export function saveReview(url, moves, full) {
 /** Your dubious moves, mistakes and blunders from engineCheck() output, worst first. */
 export const mistakesOf = (moves) => moves.filter((m) => m.mine !== false && NEGATIVE.includes(m.kind)).sort((a, b) => b.drop - a.drop || b.loss - a.loss);
 
-/** Link that opens a game in the analysis board in review mode (it finds and explains your worst move). */
+/** Your accuracy (0–100) in a reviewed game, or null. */
+export const myAccuracy = (moves) => accuracy(moves.filter((m) => m.mine !== false));
+
+/** Link that opens a game on the game analysis page (whole-game report; explains your worst move). */
 export function reviewHref(game, dev) {
   const q = new URLSearchParams({ moves: game.sans.join(' '), review: game.color, url: game.url, vs: game.opponent });
   if (dev) { q.set('dev', dev.ply); q.set('book', dev.expected.join(',')); }

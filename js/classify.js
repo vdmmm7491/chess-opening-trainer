@@ -96,3 +96,25 @@ export function isSacrifice(fen, uci) {
   }
   return worst >= 2;
 }
+
+/**
+ * Accuracy of one move (0–100) from the expected score it gave away (`drop`, 0..1): 100 for the
+ * engine's move, about 65 for a move that loses 10%, about 30 for one that loses 25%.
+ */
+export const moveAccuracy = (d) => Math.max(0, Math.min(100, 103.17 * Math.exp(-4.354 * (d || 0)) - 3.17));
+
+/**
+ * Accuracy over a set of rated moves (engineCheck() entries): the average of the arithmetic and the
+ * harmonic mean of the per-move accuracies, so a single blunder pulls the score down noticeably.
+ * @returns {number|null} 0–100, or null when there are no moves.
+ */
+export function accuracy(moves) {
+  const a = moves.map((m) => moveAccuracy(m.drop));
+  if (!a.length) return null;
+  const mean = a.reduce((s, x) => s + x, 0) / a.length;
+  const harmonic = a.length / a.reduce((s, x) => s + 1 / Math.max(1, x), 0);
+  return (mean + harmonic) / 2;
+}
+
+/** Text colour class for an accuracy figure. */
+export const accuracyClass = (acc) => (acc == null ? 'muted' : acc >= 85 ? 'good' : acc < 65 ? 'bad' : '');

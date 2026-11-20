@@ -28,8 +28,8 @@ A **free**, open-source website for practising chess openings. Works on phones a
 - **Game review** (Review tab): enter a Chess.com username to download public games through Chess.com's public API (no login needed). Your username is remembered and your games load as soon as you open the tab. You get:
   - win/draw/loss by opening, as White and as Black
   - **the moves where you left your repertoire**, with a "Drill" button for that line
-  - a **Stockfish opening check** that rates each of your moves in the first 15 moves of recent games, with our own labels: Masterstroke `!!`, Only move `!`, Top move, Solid, Theory, Dubious `?!`, Mistake `?` and Blunder `??` (a key explains each one)
-  - **game review**: click a game and Stockfish rates every move of it, both sides, then explains your worst move. Reviews are remembered in your browser, so a game is only analysed once
+  - a **Stockfish game analysis** of your recent games: every move of every game (both sides) is rated with our own labels: Masterstroke `!!`, Only move `!`, Top move, Solid, Theory, Dubious `?!`, Mistake `?` and Blunder `??` (a key explains each one), with your **accuracy** per game and on average, your best finds and your biggest mistakes
+  - **game analysis page**: click a game to see the whole game with a game report (accuracy for both players, an evaluation graph and how many moves got each label), the rating of each move as you step through it, and an explanation of your worst moves. Analyses are remembered in your browser, so a game is only analysed once
 
 ## Run it locally
 

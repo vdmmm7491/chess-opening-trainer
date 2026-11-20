@@ -1,8 +1,8 @@
-import { loadGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, getReview, saveReview, reviewHref, mistakesOf } from '../chesscom.js';
+import { loadGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, getReview, saveReview, reviewHref, mistakesOf, myAccuracy } from '../chesscom.js';
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
-import { CLASSES, POSITIVE, badgeHtml, legendHtml } from '../classify.js';
+import { CLASSES, POSITIVE, badgeHtml, legendHtml, accuracyClass } from '../classify.js';
 
 const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
@@ -127,15 +127,16 @@ export function render(root) {
       </div>`));
     }
 
-    // ---- Engine check
+    // ---- Whole-game engine analysis
     const ec = h(`<div class="card" style="margin-top:12px">
-      <h2 style="margin-top:0">Stockfish opening check</h2>
-      <p class="muted" style="margin-top:0">Runs Stockfish over the first ${CHECK_PLIES / 2} moves of your most recent games and rates each of your moves.
-        To rate a whole game, both sides, click it in Recent games.</p>
+      <h2 style="margin-top:0">Stockfish game analysis</h2>
+      <p class="muted" style="margin-top:0">Runs Stockfish over every move of your most recent games (both sides), works out your
+        accuracy and lists your best finds and biggest mistakes. Games you already analysed are instant.
+        To see one game move by move, click it in Recent games.</p>
       ${legendHtml()}
       <div class="form-row">
-        <select class="input n"><option value="5">Last 5 games</option><option value="10" selected>Last 10 games</option><option value="20">Last 20 games</option></select>
-        <button class="btn primary run">Run engine check</button>
+        <select class="input n"><option value="3">Last 3 games</option><option value="5" selected>Last 5 games</option><option value="10">Last 10 games</option><option value="20">Last 20 games</option></select>
+        <button class="btn primary run">Analyse games</button>
       </div>
       <div class="progressbar" hidden><span></span></div>
       <div class="ec-out" style="margin-top:10px"></div>
@@ -155,15 +156,16 @@ export function render(root) {
     const devBy = new Map(devs.map((d) => [d.game, d]));
     const card = h(`<div class="card" style="margin-top:12px">
       <h2 style="margin-top:0">Recent games</h2>
-      <p class="muted" style="margin-top:0">Click a game to open it on the analysis board: Stockfish rates every move of the game and explains your worst one.</p>
+      <p class="muted" style="margin-top:0">Click a game to open its analysis: Stockfish rates every move of the game, shows your accuracy and explains your worst moves.</p>
       ${legendHtml()}
-      <div class="table-wrap"><table class="recent"><thead><tr><th>Game</th><th>Opening</th><th>Your mistake</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table class="recent"><thead><tr><th>Game</th><th>Opening</th><th>Accuracy</th><th>Your worst move</th><th></th></tr></thead><tbody></tbody></table></div>
       <button class="btn more" style="margin-top:10px;width:100%">▾ Show More Games</button>
     </div>`);
     const tbody = card.querySelector('tbody'), more = card.querySelector('.more');
     const row = (g) => {
       const dev = devBy.get(g);
       const errs = getReview(g.url)?.moves;
+      const acc = errs ? myAccuracy(errs) : null;
       let issue;
       if (errs) {
         const bad = mistakesOf(errs), worst = bad[0];
@@ -175,15 +177,16 @@ export function render(root) {
       } else if (dev) {
         issue = `<span class="bad"><b>${esc(moveLabel(dev.ply, dev.played))}</b></span>
           <div class="muted" style="font-size:.8rem">left the book (${esc(dev.expected.join(' / '))})</div>`;
-      } else issue = '<span class="muted">Not checked yet</span>';
+      } else issue = '<span class="muted">Not analysed yet</span>';
       const res = { W: ['good', 'Won'], D: ['', 'Draw'], L: ['bad', 'Lost'] }[g.result];
       const href = reviewHref(g, dev);
       return `<tr class="game-row" data-href="${esc(href)}" tabindex="0" title="Open in analysis">
         <td><b class="${res[0]}">${res[1]}</b> vs ${esc(g.opponent)} <span class="muted">(${g.oppRating})</span>
           <div class="muted" style="font-size:.8rem">${g.color === 'w' ? '⚪ White' : '⚫ Black'} · ${esc(g.timeClass)} · ${new Date(g.end).toLocaleDateString()}</div></td>
         <td>${esc(g.opening)}</td>
+        <td class="acc-cell ${accuracyClass(acc)}">${acc == null ? '–' : `${acc.toFixed(1)}%`}</td>
         <td>${issue}</td>
-        <td><a class="btn small" href="${esc(href)}">Review ›</a></td></tr>`;
+        <td><a class="btn small" href="${esc(href)}">Analyse ›</a></td></tr>`;
     };
     function fill() {
       const n = Math.min(shownGames, games.length);
@@ -211,9 +214,9 @@ export function render(root) {
     const sel = games.slice(0, n);
     const btn = ec.querySelector('.run');
     const bar = ec.querySelector('.progressbar'), fill = bar.querySelector('span'), out = ec.querySelector('.ec-out');
-    btn.disabled = true; bar.hidden = false; out.innerHTML = '<p class="muted">Analysing… this takes a few seconds per game (longer on phones). Games you already reviewed are instant.</p>';
+    btn.disabled = true; bar.hidden = false; out.innerHTML = '<p class="muted">Analysing… every move of every game is checked, so this takes up to a minute or two per game (longer on phones). Games you already analysed are instant.</p>';
     const engine = getEngine();
-    const found = [];
+    const found = [], accs = [];
     try {
       for (let i = 0; i < sel.length; i++) {
         if (!alive) return;
@@ -222,11 +225,12 @@ export function render(root) {
         let moves = getReview(g.url)?.moves;
         if (moves) step(1, 1);
         else {
-          moves = await engineCheck(engine, g, { maxPly: CHECK_PLIES, onStep: step });
-          saveReview(g.url, moves, false);
+          moves = await engineCheck(engine, g, { both: true, onStep: step });
+          saveReview(g.url, moves);
+          refreshRecent?.();
         }
-        // A full review also has the rest of the game: keep to the same opening window here.
-        moves.filter((e) => e.mine !== false && e.ply < CHECK_PLIES).forEach((e) => found.push({ ...e, game: g }));
+        accs.push(myAccuracy(moves));
+        moves.filter((e) => e.mine !== false).forEach((e) => found.push({ ...e, game: g }));
       }
     } catch (e) {
       if (!alive) return;
@@ -247,9 +251,14 @@ export function render(root) {
         <td><a class="btn small" href="${esc(reviewHref(e.game))}&ply=${e.ply}">Analyse</a></td>
       </tr>`;
     const table = (rows) => `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    out.innerHTML = `${finds.length ? `<h3 style="margin-top:0">Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
+    const ok = accs.filter((a) => a != null);
+    const avg = ok.length ? ok.reduce((x, y) => x + y, 0) / ok.length : null;
+    const accLine = avg == null ? '' : `<div class="acc-row" style="max-width:420px;margin-bottom:12px">
+        <div class="acc-box me"><div class="acc-n ${accuracyClass(avg)}">${avg.toFixed(1)}<small>%</small></div><div class="acc-l">Your average accuracy</div></div>
+        <div class="acc-box"><div class="acc-n">${ok.length}</div><div class="acc-l">games analysed</div></div></div>`;
+    out.innerHTML = `${accLine}${finds.length ? `<h3 style="margin-top:0">Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
       <h3${finds.length ? '' : ' style="margin-top:0"'}>Biggest losses</h3>
-      ${errors.length ? table(errors.slice(0, 30).map(moveRow).join('')) : '<p class="good">No significant opening mistakes found in these games. 👏</p>'}`;
+      ${errors.length ? table(errors.slice(0, 30).map(moveRow).join('')) : '<p class="good">No significant mistakes found in these games. 👏</p>'}`;
   }
 
   $('.load').addEventListener('click', load);

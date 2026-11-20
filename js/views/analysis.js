@@ -3,7 +3,7 @@ import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
 import { engineCheck, getReview, saveReview, moveLabel, mistakesOf } from '../chesscom.js';
-import { CLASSES, badgeHtml, legendHtml } from '../classify.js';
+import { CLASSES, NEGATIVE, badgeHtml, legendHtml, accuracy, accuracyClass, winProb } from '../classify.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -28,15 +28,20 @@ export function render(root, { query }) {
   let reviewToken = 0, animToken = 0, alive = true;
   // Move ratings (ply -> class key) from the review or the "Rate moves" button. They apply while the
   // moves still match the ones that were rated.
-  let classes = [];
+  let classes = [], rated = [], ratedList = [], ratedFen = startFen;
   const gameSans = sans.slice();
   let ratedSans = gameSans;
-  const classOf = (i) => (classes[i] && sans.slice(0, i + 1).every((s, k) => s === ratedSans[k]) ? classes[i] : null);
+  const sameAsRated = (i) => startFen === ratedFen && sans.slice(0, i + 1).every((s, k) => s === ratedSans[k]);
+  const classOf = (i) => (classes[i] && sameAsRated(i) ? classes[i] : null);
   const setRatings = (moves, forSans) => {
-    classes = [];
-    for (const m of moves) classes[m.ply] = m.kind;
+    classes = []; rated = [];
+    for (const m of moves) { classes[m.ply] = m.kind; rated[m.ply] = m; }
+    ratedList = moves;
     ratedSans = forSans.slice();
+    ratedFen = startFen;
   };
+  // Who played White / Black, for the report.
+  const sideName = (color) => (review ? (color === review ? 'You' : query.vs || 'Opponent') : color === 'w' ? 'White' : 'Black');
 
   const view = h(`<div class="play-layout">
     <div>
@@ -50,15 +55,17 @@ export function render(root, { query }) {
     </div>
     <aside class="side">
       <div class="card">
-        <h1 style="margin:0 0 6px">Analysis board</h1>
+        <h1 style="margin:0 0 6px">${review ? 'Game analysis' : 'Analysis board'}</h1>
         <div class="muted book" style="font-size:.9rem;min-height:1.3em"></div>
       </div>
+      <div class="card report" hidden></div>
       ${review ? '<div class="card review"></div>' : ''}
       <div class="card">
         <div class="engine-line"></div>
         <label class="toggle" style="margin-top:8px"><input type="checkbox" class="arrow" checked> Show best move arrow</label>
       </div>
       <div class="card">
+        <div class="move-verdict" hidden></div>
         <div class="movelist"></div>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn small" data-act="flip">⇅ Flip</button>
@@ -117,6 +124,8 @@ export function render(root, { query }) {
     const badges = sans.map((_, i) => badgeHtml(classOf(i)));
     renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1, badges);
     $('.key-wrap').hidden = !badges.some(Boolean);
+    renderReport();
+    renderVerdict();
     bar.setOrientation(board.orientation);
     bar.setVisible(getSettings().evalBar !== false);
     const showArrow = $('.arrow').checked && !enginePlays;
@@ -131,6 +140,78 @@ export function render(root, { query }) {
         : 'Not in the trainer\'s repertoire.';
     } else bookEl.textContent = startFen === START ? 'Make a move or load a position.' : 'Custom position';
     view.querySelectorAll('[data-ep]').forEach((b) => b.classList.toggle('primary', b.dataset.ep === (enginePlays || '')));
+  }
+
+  // ---------------- Game report: accuracy, evaluation graph, label counts ----------------
+  const REPORT = ['masterstroke', 'only', 'top', 'solid', 'theory', 'dubious', 'mistake', 'blunder'];
+  function renderReport() {
+    const el = $('.report');
+    const show = ratedList.length && sameAsRated(ratedSans.length - 1) && sans.length >= ratedSans.length;
+    el.hidden = !show;
+    if (!show) return;
+    const firstTurn = startFen.split(' ')[1];
+    const colorOf = (ply) => ((ply % 2 === 0) === (firstTurn === 'w') ? 'w' : 'b');
+    const sides = ['w', 'b'].filter((c) => ratedList.some((m) => colorOf(m.ply) === c));
+    const acc = Object.fromEntries(sides.map((c) => [c, accuracy(ratedList.filter((m) => colorOf(m.ply) === c))]));
+    const count = (c, k) => ratedList.filter((m) => colorOf(m.ply) === c && m.kind === k).length;
+    const rows = REPORT.filter((k) => sides.some((c) => count(c, k))).map((k) =>
+      `<tr>${sides.map((c, i) => `${i === 1 ? `<td class="gr-c">${badgeHtml(k)} ${CLASSES[k].label}</td>` : ''}<td>${count(c, k) || '–'}</td>`).join('')}${sides.length === 1 ? `<td class="gr-c">${badgeHtml(k)} ${CLASSES[k].label}</td>` : ''}</tr>`).join('');
+    const accHtml = sides.map((c) => `<div class="acc-box${review && c === review ? ' me' : ''}">
+        <div class="acc-n ${accuracyClass(acc[c])}">${acc[c] == null ? '–' : acc[c].toFixed(1)}<small>%</small></div>
+        <div class="acc-l">${c === 'w' ? '⚪' : '⚫'} ${esc(sideName(c))}</div></div>`).join('');
+    el.innerHTML = `<h2 style="margin:0 0 8px;font-size:1.05rem">Game report</h2>
+      <div class="acc-row" title="Accuracy: how close the moves were to Stockfish's best moves (100% = always the engine's choice)">${accHtml}</div>
+      <div class="muted" style="font-size:.78rem;margin:2px 0 8px">Accuracy: how close the moves were to Stockfish's best, from the winning chances each move gave away.</div>
+      ${graphHtml()}
+      <table class="greport" style="margin-top:8px"><thead><tr>${sides.length === 2
+        ? `<th>${esc(sideName(sides[0]))}</th><th></th><th>${esc(sideName(sides[1]))}</th>`
+        : `<th>${esc(sideName(sides[0]))}</th><th></th>`}</tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  // Evaluation graph over the whole game (White's winning chances); click it to jump to a move.
+  function graphHtml() {
+    const n = ratedSans.length;
+    const known = [];
+    for (const m of ratedList) if (m.wv !== undefined) known[m.ply] = m.wv;
+    const end = ratedList.at(-1)?.wvEnd;
+    if (end !== undefined) known[n] = end;
+    if (!known.some((v) => v !== undefined) || n < 2) return '';
+    const W = 300, H = 70;
+    let last = 0;
+    const pts = [];
+    for (let p = 0; p <= n; p++) {
+      if (known[p] !== undefined) last = known[p];
+      pts.push([(p / n) * W, H * (1 - winProb(last))]);
+    }
+    const area = `M0,${H} ` + pts.map(([x, y]) => `L${x.toFixed(1)},${y.toFixed(1)}`).join(' ') + ` L${W},${H} Z`;
+    const dots = ratedList.filter((m) => ['mistake', 'blunder'].includes(m.kind) || m.kind === 'masterstroke').map((m) => {
+      const [x, y] = pts[m.ply + 1];
+      const col = m.kind === 'masterstroke' ? '#e0a106' : CLASSES[m.kind].color;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${col}" stroke="var(--panel)" stroke-width="1"><title>${esc(moveLabel(m.ply, m.san))} · ${CLASSES[m.kind].label}</title></circle>`;
+    }).join('');
+    const cx = (Math.min(cursor, n) / n) * W;
+    return `<svg class="eval-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evaluation graph: White's winning chances move by move">
+      <rect width="${W}" height="${H}" fill="var(--graph-b)"/>
+      <path d="${area}" fill="var(--graph-w)"/>
+      <line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" stroke="var(--muted)" stroke-width=".6" stroke-dasharray="3 3" opacity=".7"/>
+      <line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--accent)" stroke-width="1.6"/>
+      ${dots}</svg>`;
+  }
+
+  // What Stockfish said about the move on the board.
+  function renderVerdict() {
+    const el = $('.move-verdict');
+    const ply = cursor - 1;
+    const m = ply >= 0 && classOf(ply) ? rated[ply] : null;
+    el.hidden = !m;
+    if (!m) return;
+    const c = CLASSES[m.kind];
+    let txt;
+    if (m.kind === 'theory') txt = 'Book move from the trainer\'s repertoire.';
+    else if (NEGATIVE.includes(m.kind)) txt = `Costs about <b>${(m.loss / 100).toFixed(1)}</b> pawns. Best was <b>${esc(m.best)}</b>.`;
+    else if (m.kind === 'solid') txt = m.best ? `Stockfish slightly preferred <b>${esc(m.best)}</b>.` : esc(c.desc);
+    else txt = esc(c.desc);
+    el.innerHTML = `${badgeHtml(m.kind, 'lg')}<div><b>${esc(moveLabel(ply, m.san))} · ${c.label}</b><div class="muted" style="font-size:.85rem">${txt}</div></div>`;
   }
 
   async function maybeEngine() {
@@ -161,12 +242,12 @@ export function render(root, { query }) {
       case 'fwd': cursor = Math.min(sans.length, cursor + 1); break;
       case 'last': cursor = sans.length; break;
       case 'flip': board.flip(); break;
-      case 'reset': startFen = START; sans = []; cursor = 0; classes = []; break;
+      case 'reset': startFen = START; sans = []; cursor = 0; classes = []; ratedList = []; break;
       case 'rate': rateMoves(); return;
       case 'load': {
         const v = $('.fen').value.trim();
         if (!v) return;
-        classes = [];
+        classes = []; ratedList = [];
         try {
           new Chess(v); startFen = v; sans = []; cursor = 0;
         } catch {
@@ -179,6 +260,14 @@ export function render(root, { query }) {
       }
       default: return;
     }
+    rebuild(); sync();
+  });
+
+  $('.report').addEventListener('click', (e) => {
+    const svg = e.target.closest('.eval-graph');
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    cursor = Math.max(0, Math.min(sans.length, Math.round(((e.clientX - r.left) / r.width) * ratedSans.length)));
     rebuild(); sync();
   });
 
@@ -231,7 +320,7 @@ export function render(root, { query }) {
           both: true,
           onStep: (done, total) => { const f = total ? done / total : 1; fill.style.width = `${f * 100}%`; pct.textContent = `${Math.round(f * 100)}%`; },
         });
-        saveReview(query.url, errs, true);
+        saveReview(query.url, errs);
       } catch { errs = null; }
       if (!alive) return;
       reviewBusy = false;
@@ -284,9 +373,9 @@ export function render(root, { query }) {
     if (!alive || my !== reviewToken) return;
     reviewBusy = false;
 
-    const n = Math.min(items.length, 6);
+    const n = Math.min(items.length, 12);
     const chips = items.length && (items.length > 1 || !items.includes(item))
-      ? `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
+      ? `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Your moves to look at (worst first):</span>
           <div class="btn-row" style="margin-top:4px">${items.slice(0, n).map((e, i) => `<button class="btn small${e === item ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}</button>`).join('')}</div></div>`
       : '';
     const link = query.url && /^https:\/\/(www\.)?chess\.com\//.test(query.url)
