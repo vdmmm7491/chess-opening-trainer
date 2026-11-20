@@ -1,9 +1,11 @@
-import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES } from '../chesscom.js';
+import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, reviewCache, reviewHref } from '../chesscom.js';
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
 
 let cache = null; // { user, months, games } kept while the tab is open
+let shownGames = 5; // how many recent games are expanded (kept while the tab is open)
+const FIRST_GAMES = 5, MORE_GAMES = 10;
 
 export function render(root) {
   let alive = true;
@@ -39,6 +41,7 @@ export function render(root) {
   const userEl = $('.user');
   userEl.value = getSettings().chesscomUser || '';
 
+  let refreshRecent = null;
   const pb = $('.progressbar'), pbFill = pb.querySelector('span'), msg = $('.msg'), results = $('.results');
   const setProgress = (p) => { pb.hidden = p === null; pbFill.style.width = `${Math.round((p || 0) * 100)}%`; };
 
@@ -53,6 +56,7 @@ export function render(root) {
     try {
       if (!cache || cache.user !== user.toLowerCase() || cache.months !== months) {
         cache = { user: user.toLowerCase(), months, games: await fetchGames(user, months, setProgress) };
+        shownGames = FIRST_GAMES;
       }
       if (!alive) return;
       setProgress(null);
@@ -78,8 +82,11 @@ export function render(root) {
       <div class="card stat"><div class="n bad">${L}</div><div class="l">losses</div></div>
     </div>`));
 
+    const devs = findDeviations(games);
+    results.appendChild(recentGames(games, devs));
+
     // ---- Repertoire deviations
-    const groups = groupDeviations(findDeviations(games));
+    const groups = groupDeviations(devs);
     const devRows = groups.slice(0, 25).map((d) => {
       const ex = d.expected.map(esc).join(' / ');
       return `<tr>
@@ -128,6 +135,60 @@ export function render(root) {
     ec.querySelector('.run').addEventListener('click', () => runEngine(games, ec));
   }
 
+  // ---- Recent games: a few at first, "Show more games" expands the list
+  function recentGames(games, devs) {
+    const devBy = new Map(devs.map((d) => [d.game, d]));
+    const card = h(`<div class="card" style="margin-top:12px">
+      <h2 style="margin-top:0">Recent games</h2>
+      <p class="muted" style="margin-top:0">Click a game to open it on the analysis board: Stockfish finds the worst move you played in the opening and explains what was wrong with it.</p>
+      <div class="table-wrap"><table class="recent"><thead><tr><th>Game</th><th>Opening</th><th>Your mistake</th><th></th></tr></thead><tbody></tbody></table></div>
+      <button class="btn more" style="margin-top:10px;width:100%">▾ Show More Games</button>
+    </div>`);
+    const tbody = card.querySelector('tbody'), more = card.querySelector('.more');
+    const row = (g) => {
+      const dev = devBy.get(g);
+      const errs = reviewCache.get(g.url);
+      let issue;
+      if (errs) {
+        const worst = errs[0];
+        issue = worst
+          ? `<span class="kind kind-${worst.kind.toLowerCase()}">${worst.kind}</span> <b>${esc(moveLabel(worst.ply, worst.san))}</b>
+             <div class="muted" style="font-size:.8rem">better: ${esc(worst.best)}${errs.length > 1 ? ` · +${errs.length - 1} more` : ''}</div>`
+          : '<span class="good">No opening mistakes</span>';
+      } else if (dev) {
+        issue = `<span class="bad"><b>${esc(moveLabel(dev.ply, dev.played))}</b></span>
+          <div class="muted" style="font-size:.8rem">left the book (${esc(dev.expected.join(' / '))})</div>`;
+      } else issue = '<span class="muted">Not checked yet</span>';
+      const res = { W: ['good', 'Won'], D: ['', 'Draw'], L: ['bad', 'Lost'] }[g.result];
+      const href = reviewHref(g, dev);
+      return `<tr class="game-row" data-href="${esc(href)}" tabindex="0" title="Open in analysis">
+        <td><b class="${res[0]}">${res[1]}</b> vs ${esc(g.opponent)} <span class="muted">(${g.oppRating})</span>
+          <div class="muted" style="font-size:.8rem">${g.color === 'w' ? '⚪ White' : '⚫ Black'} · ${esc(g.timeClass)} · ${new Date(g.end).toLocaleDateString()}</div></td>
+        <td>${esc(g.opening)}</td>
+        <td>${issue}</td>
+        <td><a class="btn small" href="${esc(href)}">Review ›</a></td></tr>`;
+    };
+    function fill() {
+      const n = Math.min(shownGames, games.length);
+      tbody.innerHTML = games.slice(0, n).map(row).join('');
+      const left = games.length - n;
+      more.hidden = left <= 0;
+      more.textContent = `▾ Show More Games (${left} more)`;
+    }
+    more.addEventListener('click', () => { shownGames += MORE_GAMES; fill(); });
+    const open = (e) => {
+      const tr = e.target.closest('.game-row');
+      if (!tr || e.target.closest('a')) return;
+      if (e.type === 'keydown' && e.key !== 'Enter') return;
+      location.hash = tr.dataset.href;
+    };
+    tbody.addEventListener('click', open);
+    tbody.addEventListener('keydown', open);
+    fill();
+    refreshRecent = fill;
+    return card;
+  }
+
   async function runEngine(games, ec) {
     const n = Number(ec.querySelector('.n').value);
     const sel = games.slice(0, n);
@@ -142,6 +203,7 @@ export function render(root) {
       for (const g of sel) {
         if (!alive) return;
         const errs = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
+        reviewCache.set(g.url, [...errs].sort((a, b) => b.loss - a.loss));
         errs.forEach((e) => found.push({ ...e, game: g }));
       }
     } catch (e) {
@@ -150,6 +212,7 @@ export function render(root) {
       btn.disabled = false; return;
     }
     btn.disabled = false; bar.hidden = true;
+    refreshRecent?.();
     found.sort((a, b) => b.loss - a.loss);
     if (!found.length) { out.innerHTML = '<p class="good">No significant opening mistakes found in these games. 👏</p>'; return; }
     out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${
@@ -159,7 +222,7 @@ export function render(root) {
         <td class="${e.kind === 'Inaccuracy' ? 'warn' : 'bad'}">${esc(moveLabel(e.ply, e.san))}<div style="font-size:.8rem">${e.kind}</div></td>
         <td>${(e.loss / 100).toFixed(1)}</td>
         <td>${esc(e.best)}</td>
-        <td><a class="btn small" href="#/analysis?moves=${encodeURIComponent(e.game.sans.slice(0, e.ply).join(' '))}">Analyse</a></td>
+        <td><a class="btn small" href="${esc(reviewHref(e.game))}&ply=${e.ply}">Analyse</a></td>
       </tr>`).join('')}</tbody></table></div>`;
   }
 

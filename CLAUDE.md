@@ -3,6 +3,7 @@
 - Pure static site: plain ES modules, **no build step, no package.json**. Deployed with GitHub Pages from `main` / root.
 - External deps are loaded from pinned CDN URLs: chess.js `1.0.0` (jsDelivr `+esm`) and lichess cburnett piece SVGs. Stockfish is vendored in `engine/stockfish.js` (asm.js, loaded as a same-origin Web Worker; GitHub Pages can't set COOP/COEP headers, so don't switch to a multi-threaded build).
 - Routing is hash-based in `js/app.js`. Each view in `js/views/` exports `render(root, {id, query})` and may return a cleanup function.
+- Game review: `#/analysis?review=w|b&moves=…` (built by `reviewHref` in `js/chesscom.js`) runs `engineCheck` on the game, then explains the worst move with `analyseMistake`. Results are cached per game URL in `reviewCache`, which the Chess.com tab's "Recent games" list also reads.
 - Only ONE shared engine instance (`getEngine()`). A new `analyse()` call stops the running search.
 - Progress lives in localStorage under `opening-trainer.v1` and is keyed by `openingId:lineIndex`. Never rename opening ids or reorder existing lines; add new lines at the end.
 - Every opening needs `levels` (keys of `LEVELS` in `js/openings.js`) and a one-sentence `levelNote`.

@@ -329,3 +329,7 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .evalbar .label { font-size: 8px; }
   h1 { font-size: 1.25rem; }
 }
+
+/* Chess.com tab: recent games */
+.game-row { cursor: pointer; }
+.game-row:hover, .game-row:focus-visible { background: var(--panel-hover); outline: none; }
