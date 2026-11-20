@@ -236,6 +236,9 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .quiz-progress { display: flex; gap: 14px; align-items: baseline; font-weight: 700; font-size: 0.95rem; }
 .quiz-progress .q-score { color: var(--good); }
 .quiz-progress .quiz-best { margin-left: auto; font-weight: 400; font-size: 0.85rem; }
+/* Opening name line inside the status card and the Learn/Practice tabs: phones only. */
+.quiz-head { display: none; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.quiz-actions .quiz-tab { display: none; }
 
 /* ---------- coach ---------- */
 .coach { border-left: 4px solid var(--accent); }
@@ -321,6 +324,29 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .status-card .movelist { max-height: 76px; }
   /* Only the newest coach message, so it fits on screen. */
   .coach-body .coach-entry:not(:first-child) { display: none; }
+
+  /* Quiz on phones/tablets: opening name, moves and coach stay on screen, and the
+     buttons become a tab bar fixed to the bottom so Next never needs a scroll. */
+  body:has(.quiz-view) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .play-layout.quiz-view { grid-template-columns: minmax(0, 1fr); }
+  .quiz-view .board-wrap { max-width: max(240px, min(100%, calc(100svh - 460px))); }
+  .quiz-view .quiz-intro { display: none; }
+  .quiz-view .quiz-head { display: flex; }
+  .quiz-view .status-card { padding: 10px 12px; }
+  .quiz-view .status-card .bar { margin: 6px 0 !important; height: 6px; }
+  .quiz-view .status { font-size: 0.95rem; }
+  /* Moves on one swipeable row (scrolled to the newest move). */
+  .quiz-view .movelist { flex-wrap: nowrap; white-space: nowrap; overflow-x: auto; max-height: none; scrollbar-width: none; }
+  .quiz-view .coach { padding: 10px 12px; scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .quiz-view .coach-head { margin-bottom: 4px; }
+  .quiz-view .quiz-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0;
+    display: grid; grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr)); gap: 6px;
+    border-radius: 0; border-width: 1px 0 0; padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    box-shadow: 0 -6px 20px rgba(0,0,0,0.3);
+  }
+  .quiz-view .quiz-actions .btn { padding: 4px; font-size: 0.74rem; line-height: 1.15; min-height: 44px; text-align: center; }
+  .quiz-view .quiz-actions .quiz-tab { display: inline-flex; }
 }
 @media (max-width: 640px) {
   .app { padding: 10px 8px; }
