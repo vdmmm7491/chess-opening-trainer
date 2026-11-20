@@ -64,8 +64,7 @@ function viewer(root, id) {
     </div>
     <aside class="side">
       <div class="card gc-head">
-        <a href="#/games" class="muted" style="font-size:.85rem">← All famous games</a>
-        <h1 style="margin:6px 0 4px">${esc(g.title)}</h1>
+        <h1 style="margin:0 0 4px">${esc(g.title)}</h1>
         <div class="muted" style="font-size:.9rem">${esc(g.white)} – ${esc(g.black)}, ${esc(g.event)} ${g.year} · <b>${esc(g.result)}</b></div>
         <div class="lvl-row" style="margin-top:8px"><span class="lvl" style="--lvl:var(--accent)">${esc(g.opening)}</span></div>
       </div>
