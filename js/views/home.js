@@ -70,7 +70,7 @@ export function render(root) {
         <div class="lvl-row">${levelBadges(o)}</div>
         <p>${esc(o.description)}</p>
         ${o.levelNote ? `<p class="level-note">🎯 ${esc(o.levelNote)}</p>` : ''}
-        <div class="kv"><span class="muted">${o.lines.length} lines · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by books and sites like Chess.com" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span></div>
+        <div class="kv"><span class="muted">${o.lines.length} lines · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by opening books and databases" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span></div>
         ${progressBar(p)}
         <div class="btn-row">
           <a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>

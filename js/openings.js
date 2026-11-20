@@ -8,10 +8,10 @@
 
 /** Rating bands, in order. `max` is exclusive. */
 export const LEVELS = {
-  beginner: { name: 'Beginner', range: 'Under 1000', min: 0, max: 1000, color: '#81b64c' },
-  intermediate: { name: 'Intermediate', range: '1000–1600', min: 1000, max: 1600, color: '#48b4f0' },
-  advanced: { name: 'Advanced', range: '1600–2000', min: 1600, max: 2000, color: '#f7a440' },
-  expert: { name: 'Expert', range: '2000+', min: 2000, max: Infinity, color: '#e8615a' },
+  beginner: { name: 'Beginner', range: 'Under 1000', min: 0, max: 1000, color: '#34b37e' },
+  intermediate: { name: 'Intermediate', range: '1000–1600', min: 1000, max: 1600, color: '#3b82f6' },
+  advanced: { name: 'Advanced', range: '1600–2000', min: 1600, max: 2000, color: '#f08c00' },
+  expert: { name: 'Expert', range: '2000+', min: 2000, max: Infinity, color: '#ef5350' },
 };
 
 /** The level key for a rating number, e.g. 850 -> 'beginner'. */

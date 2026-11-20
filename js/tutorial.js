@@ -55,7 +55,7 @@ const STEPS = [
   { route: '#/progress', target: '.backup-card', title: 'Backup',
     text: 'Progress is saved in this browser. Export it here and import it on another device to carry on there.' },
   { route: '#/progress', target: '#nav a[data-route="chesscom"]', click: true, title: 'Chess.com review',
-    text: 'Last tab: <b>Chess.com</b>.' },
+    text: 'Last tab: <b>Review</b>.' },
   { route: '#/chesscom', target: '.form-row', title: 'Review your real games',
     text: 'Enter your Chess.com username to see your results by opening, the moves where you left your repertoire (with a button to drill that line) and the opening moves that cost you the most.' },
   { route: '#/', target: '#settingsBtn', title: 'Appearance',

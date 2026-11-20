@@ -2,16 +2,19 @@
 // - Left button / touch: tap-to-move or drag-and-drop (pointer events)
 // - Right-click drag: draw arrows; right-click a square: highlight it (Shift/Ctrl/Alt = other colours)
 // - Left-click anywhere clears drawn arrows and highlights
-import { pieceSet } from './theme.js';
+// - setFen() animates the change: pieces slide (castling moves both king and rook), captured pieces
+//   fade out, a promoted pawn turns into its new piece, check pulses the king, checkmate topples it.
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
+import { pieceSet, animationsOn } from './theme.js';
 
 // Piece SVGs are shipped with the site (assets/pieces/<set>/), copied from lichess (see LICENSE.md there).
 // Loading them from a CDN was unreliable: pieces sometimes failed to appear.
 const PIECE_BASE = 'assets/pieces/';
 const FILES = 'abcdefgh';
 
-// Arrow / highlight palette (similar to what players are used to on big chess sites)
-export const ARROW_COLORS = { orange: '#ffaa00', green: '#9fcf3f', red: '#f2543d', blue: '#48b4f0' };
-const MARK_COLORS = { orange: '#ffaa00', green: '#acce59', red: '#eb6150', blue: '#52b0dc' };
+// Arrow / highlight palette
+export const ARROW_COLORS = { orange: '#f39c12', green: '#3fae6a', red: '#e5484d', blue: '#3b8cf0' };
+const MARK_COLORS = { orange: '#f5a524', green: '#4cbf78', red: '#e85d61', blue: '#4f9af2' };
 
 export function pieceUrl(color, type, set = pieceSet()) {
   return `${PIECE_BASE}${set}/${color}${type.toUpperCase()}.svg`;
@@ -36,6 +39,34 @@ function parseFen(fen) {
     }
   });
   return map;
+}
+
+/** Pair up the pieces that left a square with the ones that arrived, so they can slide. */
+function diffPieces(before, after, lastMove) {
+  const same = (a, b) => a && b && a.color === b.color && a.type === b.type;
+  const gone = [], came = [];
+  for (const sq of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (same(before[sq], after[sq])) continue;
+    if (before[sq]) gone.push(sq);
+    if (after[sq]) came.push(sq);
+  }
+  const moves = [], usedFrom = new Set(), usedTo = new Set();
+  const dist = (a, b) => Math.hypot(FILES.indexOf(a[0]) - FILES.indexOf(b[0]), a[1] - b[1]);
+  // The move that was just played first: this also pairs a pawn with the piece it promoted to.
+  if (lastMove && gone.includes(lastMove.from) && came.includes(lastMove.to) && before[lastMove.from].color === after[lastMove.to].color) {
+    moves.push({ from: lastMove.from, to: lastMove.to, promo: before[lastMove.from].type !== after[lastMove.to].type });
+    usedFrom.add(lastMove.from); usedTo.add(lastMove.to);
+  }
+  for (const to of came) {
+    if (usedTo.has(to)) continue;
+    const cands = gone.filter((f) => !usedFrom.has(f) && same(before[f], after[to])).sort((a, b) => dist(a, to) - dist(b, to));
+    if (cands[0]) { moves.push({ from: cands[0], to }); usedFrom.add(cands[0]); usedTo.add(to); }
+  }
+  return {
+    moves,
+    captured: gone.filter((sq) => !usedFrom.has(sq)), // removed, or taken by the piece that landed there
+    appeared: came.filter((sq) => !usedTo.has(sq)),   // e.g. a captured piece coming back when you step backwards
+  };
 }
 
 function modifierColor(e) {
@@ -65,9 +96,11 @@ export class Board {
     this.arrows = [];      // arrows set by the app (answers, engine)
     this.userArrows = [];  // arrows drawn by the user
     this.marks = {};       // square -> colour key, drawn by the user
+    this.badge = null;     // {sq, html}: a move-classification badge in a square's corner
     this.preview = null;   // arrow being drawn
     this.drag = null;
     this.rdrag = null;
+    this.timers = new Set(); // pending animation steps
     this.build();
     this.bind();
   }
@@ -95,17 +128,125 @@ export class Board {
     this.renderPieces();
     this.renderHighlights();
     this.renderMarks();
+    this.renderBadge();
     this.renderArrows();
   }
 
+  /** Show `html` in the top-right corner of `sq` (null clears it). */
+  setBadge(sq, html) { this.badge = sq && html ? { sq, html } : null; this.renderBadge(); }
+
+  renderBadge() {
+    this.el.querySelector('.sq-badge')?.remove();
+    if (!this.badge) return;
+    const b = document.createElement('div');
+    b.className = 'sq-badge';
+    b.innerHTML = this.badge.html;
+    this.squares[this.badge.sq]?.appendChild(b);
+  }
+
   setFen(fen, lastMove = null, checkSq = null) {
+    const before = this.pieces;
+    const prevCheck = this.checkSq, prevMate = this.mateSq;
     this.pieces = parseFen(fen);
     this.lastMove = lastMove;
     this.checkSq = checkSq;
+    this.mateSq = null;
+    if (checkSq) { try { if (new Chess(fen).isCheckmate()) this.mateSq = checkSq; } catch { /* partial FEN */ } }
     this.selected = null;
     this.hints = [];
+    this.stopAnimations(); // a new position cuts any running animation short: only the latest one plays
+    const skip = this.skipAnim;
+    this.skipAnim = null;
     this.renderPieces();
     this.renderHighlights();
+    if (!animationsOn()) return;
+    const d = diffPieces(before, this.pieces, lastMove);
+    // Jumping far through a game (⏮ / ⏭) changes most of the board: just show the new position.
+    if (d.moves.length + d.captured.length + d.appeared.length > 10) return;
+    this.animate(d, before, skip);
+    const king = (sq) => this.squares[sq].querySelector('.piece:not(.ghost)');
+    if (this.mateSq && this.mateSq !== prevMate) {
+      this.pulse(this.mateSq, 'anim-mate', 150);
+      king(this.mateSq)?.animate([{ rotate: '0deg', translate: '0 0' }, { rotate: '-80deg', translate: '-4% 10%' }],
+        { duration: 650, delay: 350, easing: 'cubic-bezier(.5,-0.4,.7,1.4)', fill: 'backwards' });
+    } else if (checkSq && checkSq !== prevCheck) {
+      this.pulse(checkSq, 'anim-check', 120);
+      king(checkSq)?.animate([{ rotate: '0deg' }, { rotate: '-9deg' }, { rotate: '8deg' }, { rotate: '-5deg' }, { rotate: '3deg' }, { rotate: '0deg' }],
+        { duration: 450, delay: 150, easing: 'ease-in-out' });
+    }
+  }
+
+  /** setTimeout that stopAnimations() can cancel. */
+  later(fn, ms) {
+    const id = setTimeout(() => { this.timers.delete(id); fn(); }, ms);
+    this.timers.add(id);
+  }
+
+  /** Jump every running animation to its end: drop leftover captured pieces, effects and pending steps. */
+  stopAnimations() {
+    this.animGen = (this.animGen || 0) + 1; // callbacks of cut-short animations see a stale number and do nothing
+    for (const id of this.timers) clearTimeout(id);
+    this.timers.clear();
+    this.el.querySelectorAll('.ghost, .sq-fx').forEach((x) => x.remove());
+    for (const a of this.el.getAnimations({ subtree: true })) if (!(a instanceof CSSAnimation)) a.finish();
+  }
+
+  /** Square offset (in squares, on screen) from `to` back to `from`. */
+  offset(from, to) {
+    const [x1, y1] = this.sqCenter(from), [x2, y2] = this.sqCenter(to);
+    return [x1 - x2, y1 - y2];
+  }
+
+  animate({ moves, captured, appeared }, before, skip) {
+    const pieceEl = (sq) => this.squares[sq].querySelector('.piece:not(.ghost)');
+    const gen = this.animGen;
+    for (const m of moves) {
+      const el = pieceEl(m.to);
+      if (!el) continue;
+      if (skip && skip.from === m.from && skip.to === m.to) { if (m.promo) this.pulse(m.to, 'anim-promo'); continue; }
+      const [dx, dy] = this.offset(m.from, m.to);
+      const ms = Math.min(320, 160 + 35 * Math.hypot(dx, dy));
+      el.classList.add('moving');
+      const a = el.animate([{ transform: `translate(${dx * 100}%, ${dy * 100}%)` }, { transform: 'translate(0, 0)' }],
+        { duration: ms, easing: 'cubic-bezier(.25,.8,.35,1)' });
+      a.onfinish = a.oncancel = () => {
+        el.classList.remove('moving');
+        if (m.promo && gen === this.animGen) this.pulse(m.to, 'anim-promo');
+      };
+      if (m.promo) {
+        // Slide the pawn, then swap it for the new piece.
+        const img = el.style.backgroundImage;
+        const p = before[m.from];
+        el.style.backgroundImage = `url(${pieceUrl(p.color, p.type)})`;
+        this.later(() => { if (el.isConnected) el.style.backgroundImage = img; }, ms);
+      }
+    }
+    // A captured piece just fades out while the capturing piece slides in (no shrink, spin or burst).
+    for (const sq of captured) {
+      const by = moves.find((m) => m.to === sq);
+      if (!by) continue;
+      const p = before[sq];
+      const ghost = document.createElement('div');
+      ghost.className = 'piece ghost';
+      ghost.style.backgroundImage = `url(${pieceUrl(p.color, p.type)})`;
+      this.squares[sq].appendChild(ghost);
+      ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-out', fill: 'forwards' }).onfinish = () => ghost.remove();
+      this.later(() => ghost.remove(), 450);
+    }
+    for (const sq of appeared) {
+      pieceEl(sq)?.animate([{ opacity: 0, transform: 'scale(0.8)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' });
+    }
+  }
+
+  /** One-off effect on a square (check, promotion glow, checkmate). */
+  pulse(sq, cls, delay = 0) {
+    const run = () => {
+      const fx = document.createElement('div');
+      fx.className = 'sq-fx ' + cls;
+      this.squares[sq]?.appendChild(fx);
+      this.later(() => fx.remove(), 1200);
+    };
+    if (delay) this.later(run, delay); else run();
   }
 
   setOrientation(color) {
@@ -138,7 +279,7 @@ export class Board {
   }
 
   renderPieces() {
-    for (const div of Object.values(this.squares)) div.querySelector('.piece')?.remove();
+    for (const div of Object.values(this.squares)) div.querySelectorAll('.piece').forEach((x) => x.remove());
     for (const [sq, p] of Object.entries(this.pieces)) {
       const d = document.createElement('div');
       d.className = 'piece';
@@ -154,6 +295,7 @@ export class Board {
       div.classList.toggle('sel', this.selected === sq);
       div.classList.toggle('hint', this.hints.includes(sq));
       div.classList.toggle('check', this.checkSq === sq);
+      div.classList.toggle('mated', this.mateSq === sq);
       const isDest = dests.includes(sq);
       div.classList.toggle('dot', isDest && !this.pieces[sq]);
       div.classList.toggle('cap', isDest && !!this.pieces[sq]);
@@ -335,7 +477,8 @@ export class Board {
     if (d.el) { d.el.classList.remove('dragging'); d.el.style.transform = ''; }
     const sq = this.squareAt(e.clientX, e.clientY);
     if (d.moved) {
-      if (sq && sq !== d.from && this.getDests(d.from).includes(sq)) this.tryMove(d.from, sq);
+      // The piece was dragged there already: don't slide it in from its old square.
+      if (sq && sq !== d.from && this.getDests(d.from).includes(sq)) { this.skipAnim = { from: d.from, to: sq }; this.tryMove(d.from, sq); }
     } else if (d.wasSelected && sq === d.from) {
       // tapping a selected piece again deselects it
       this.selected = null;

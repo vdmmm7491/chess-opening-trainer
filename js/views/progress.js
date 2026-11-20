@@ -1,7 +1,7 @@
 import { OPENINGS, getOpening } from '../openings.js';
 import { summary, openingProgress, lineProgress, lineStats, activityDays, history, exportJson, importJson, resetAll, today, mastery, getSettings, setSetting } from '../progress.js';
 import { h, esc, progressBar } from '../ui.js';
-import { fetchGames } from '../chesscom.js';
+import { loadGames } from '../chesscom.js';
 import { recommend, levelName, prettyFamily } from '../recommend.js';
 
 export function render(root) {
@@ -130,7 +130,7 @@ function learnNextSection(isAlive) {
     msg.textContent = 'Downloading games…'; out.innerHTML = '';
     pb.hidden = false; pbFill.style.width = '0%';
     try {
-      games = await fetchGames(user, MONTHS, (p) => { pbFill.style.width = `${Math.round(p * 100)}%`; });
+      games = await loadGames(user, MONTHS, (p) => { pbFill.style.width = `${Math.round(p * 100)}%`; });
     } catch (e) {
       if (isAlive()) { pb.hidden = true; msg.textContent = '⚠ ' + e.message; }
       return;

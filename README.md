@@ -73,7 +73,7 @@ Set up any position, see the engine's best move and play against Stockfish, all 
 <td width="50%" valign="top">
 
 ### 📈 Track your progress
-Daily streak, an activity calendar, and how well you know each opening and line.
+Daily streak, an activity calendar, and how well you know each opening and line. Add your Chess.com username and **What to learn next** finds the openings you keep losing to and suggests one that counters each.
 
 <img src="docs/screenshots/progress.png" alt="Progress page with streak, activity and mastery">
 
@@ -81,7 +81,7 @@ Daily streak, an activity calendar, and how well you know each opening and line.
 </tr>
 </table>
 
-- **Chess.com review.** Enter your username to see how you score with each opening, and the exact moves where you left your repertoire, with a button to drill that line.
+- **Game review.** Enter your Chess.com username to see how you score with each opening and the moves where you left your repertoire, then have Stockfish rate every move of any game.
 - **Play on.** When the book line ends, keep playing the position against Stockfish.
 - **Draw on the board.** Right-click and drag for arrows, right-click a square to highlight it.
 - **Make it yours.** 6 piece sets, 6 board colours, dark or light theme.
@@ -155,14 +155,24 @@ tools/              local server and validator
 
 ---
 
-## Credits
+## Credits & licence
 
-- Engine: [Stockfish](https://stockfishchess.org) (GPL-3.0), via the `stockfish.js` 10.0.2 build by nmrugg
-- Move logic: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2)
-- Piece sets from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md): Staunty, Maestro and Cardinal by sadsnake1 (CC BY-NC-SA 4.0); Merida and cburnett (GPLv2+); Governor
-- Game data: [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api)
+This project is licensed under **GPL-3.0** (see `LICENSE`) because it ships Stockfish.
 
-Licensed under **GPL-3.0** (see [LICENSE](LICENSE)) because it ships Stockfish.
+- **Engine**: [Stockfish](https://stockfishchess.org) 10 by T. Romstad, M. Costalba, J. Kiiski, G. Linscott and contributors (GPL-3.0),
+  compiled to JavaScript by Niklas Fiekas ([stockfish.js](https://github.com/niklasf/stockfish.js), the source for `engine/stockfish.js`).
+- **Move logic**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa (BSD-2-Clause), loaded from jsDelivr.
+- **Piece sets** (shipped in `assets/pieces/`, copied from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md); details in `assets/pieces/LICENSE.md`):
+  - cburnett (the default, "Classic") by Colin M.L. Burnett and Merida by Armando Hernandez Marroquin: GPLv2+
+  - Staunty, Maestro and Cardinal by sadsnake1: CC BY-NC-SA 4.0, **non-commercial only**. Remove them before adding ads, paid features or anything else commercial.
+- **Game data**: your games come from the [Chess.com Published-Data API](https://www.chess.com/news/view/published-data-api). They are downloaded in your browser and never stored on a server.
+- **Famous games**: the move scores are historical facts, checked against the source linked on each game. The descriptions and the move-by-move commentary (`js/game-notes.js`) are written for this site, paraphrasing the games' published annotations.
+- **Opening notes**: the coach's explanations are written for this site. "Read more" links point to the original articles rather than copying them.
+- **Design**: the colours, board themes, move labels and badges are this project's own. The move symbols (`!!`, `!`, `?!`, `?`, `??`) are the traditional chess annotation marks.
+
+### Trademarks
+
+Chess.com, Lichess and Stockfish are names of their respective owners. They are used here only to say where data comes from and which engine runs. This project is not affiliated with or endorsed by any of them.
 
 <div align="center">
 
