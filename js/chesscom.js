@@ -1,7 +1,7 @@
 // Chess.com public API helpers (no login needed – the API is public and CORS-enabled).
 // Docs: https://www.chess.com/news/view/published-data-api
 import { Chess, findBook } from './ui.js';
-import { classify, isSacrifice, NEGATIVE } from './classify.js';
+import { classify, isSacrifice, drop, DROP, NEGATIVE } from './classify.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 const API = 'https://api.chess.com/pub/player/';
@@ -117,69 +117,111 @@ export function groupDeviations(devs) {
 const clamp = (v) => Math.max(-1500, Math.min(1500, v));
 
 /**
- * Run Stockfish over the opening phase of a game and classify each of your moves
+ * Run Stockfish over a game and classify its moves
  * (theory / top / only move / masterstroke / solid / dubious / mistake / blunder).
- * @returns {Promise<Array<{ply, san, loss, best, fenBefore, kind}>>} one entry per classified move;
- *   `kind` is a key of CLASSES in classify.js.
+ * @param {{sans:string[], color?:'w'|'b'|null, startFen?:string}} game  `color` = your side.
+ * @param {{maxPly?:number, depth?:number, both?:boolean, onStep?:(done:number,total:number)=>void}} opts
+ *   both: rate your opponent's moves too (always the case when game.color is not set).
+ * @returns {Promise<Array<{ply, san, loss, drop, best, fenBefore, kind, mine}>>} one entry per rated move,
+ *   in order; `kind` is a key of CLASSES in classify.js, `loss` is in centipawns.
+ *
+ * Speed: each position is searched once (with the two best lines). The played move's score comes
+ * from that search when it was one of those two lines, otherwise from the search of the next
+ * position (which the next move needs anyway). Only moves that look like a mistake get a second,
+ * deeper search of the played move from the same position to confirm it, as comparing two searches
+ * from the same root is more stable than comparing consecutive positions.
  */
-// For each of your moves we search the position twice at the same depth: once freely with the two
-// best lines (to spot "only moves"), and once restricted to the move you played. Comparing two
-// searches from the same root is far more stable than comparing evaluations of consecutive positions.
-export const CHECK_PLIES = 24;
+export const CHECK_PLIES = 30; // the Review tab's bulk check: the first 15 moves of each game
 
-export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 12, onStep } = {}) {
-  const c = new Chess();
-  const n = Math.min(game.sans.length, maxPly);
-  const sign = game.color === 'w' ? 1 : -1;
-  const score = (info) => clamp((info?.whiteCp ?? 0) * sign);
+export async function engineCheck(engine, game, { maxPly = Infinity, depth = 12, both = false, onStep } = {}) {
+  const startFen = game.startFen || START_FEN;
+  const c = new Chess(startFen);
+  const fens = [c.fen()], moves = [];
+  for (const san of game.sans.slice(0, maxPly)) {
+    try { moves.push(c.move(san)); } catch { break; }
+    fens.push(c.fen());
+  }
+  const n = moves.length;
+  const turnAt = (i) => fens[i].split(' ')[1];
+  const rateAll = both || !game.color;
+  const plies = [...Array(n).keys()].filter((i) => rateAll || turnAt(i) === game.color);
   const run = async (fen, opts) => {
     const r = await engine.analyse(fen, { depth, ...opts });
     if (r.cancelled) throw new Error('cancelled');
     return r;
   };
-  const out = [];
-  let prev = null;
-  for (let ply = 0; ply < n; ply++) {
-    const fen = c.fen();
-    const mv = c.move(game.sans[ply]);
-    const last = prev;
-    prev = mv;
-    const myTurn = (ply % 2 === 0) === (game.color === 'w');
-    if (!myTurn) continue;
-    const book = findBook(game.sans.slice(0, ply + 1));
-    const inBook = book && book.inBook && book.depth === ply + 1;
-    // Skip the first 3 moves each unless they're in the repertoire: they're theory, and a shallow
-    // browser engine judges offbeat but sound choices (1.b3, 1...g6) too harshly.
-    if (ply < 6 && !inBook) continue;
-    if (ply >= 6) onStep?.();
-    if (inBook) { out.push({ ply, san: mv.san, loss: 0, best: '', fenBefore: fen, kind: 'theory' }); continue; }
+  // Best-play evaluation of position i (White's view), searched at most once.
+  const evals = new Map();
+  const evalAt = async (i) => {
+    if (!evals.has(i)) {
+      const p = new Chess(fens[i]);
+      let e;
+      if (p.isCheckmate()) e = { wv: p.turn() === 'w' ? -1500 : 1500, lines: [] };
+      else if (p.isGameOver()) e = { wv: 0, lines: [] };
+      else {
+        const r = await run(fens[i], { multipv: 2 });
+        e = { wv: clamp(r.info?.whiteCp ?? 0), lines: r.lines || [], bestmove: r.bestmove };
+      }
+      evals.set(i, e);
+    }
+    return evals.get(i);
+  };
 
-    const top = await run(fen, { multipv: 2 });
-    if (!top.bestmove) continue;
+  const out = [];
+  let done = 0;
+  for (const ply of plies) {
+    onStep?.(done++, plies.length);
+    const mv = moves[ply], fen = fens[ply];
+    const sign = turnAt(ply) === 'w' ? 1 : -1;
+    const entry = { ply, san: mv.san, loss: 0, drop: 0, best: '', fenBefore: fen, mine: !game.color || turnAt(ply) === game.color };
+    if (startFen === START_FEN) {
+      const book = findBook(game.sans.slice(0, ply + 1));
+      if (book && book.inBook && book.depth === ply + 1) { out.push({ ...entry, kind: 'theory' }); continue; }
+    }
+    const e = await evalAt(ply);
+    if (!e.bestmove) continue;
     const playedUci = mv.from + mv.to + (mv.promotion || '');
-    const bestScore = score(top.lines[0] || top.info);
-    const isBest = top.bestmove === playedUci;
-    const playedScore = isBest ? bestScore : score((await run(fen, { searchmoves: [playedUci] })).info);
+    const bestScore = sign * e.wv;
+    const isBest = e.bestmove === playedUci;
+    let playedScore;
+    if (isBest) playedScore = bestScore;
+    else if (e.lines[1]?.pv?.[0] === playedUci) playedScore = sign * clamp(e.lines[1].whiteCp);
+    else {
+      // Rating both sides: the next position gets searched anyway, so use it. Otherwise search
+      // this position restricted to the played move.
+      playedScore = rateAll || evals.has(ply + 1)
+        ? sign * (await evalAt(ply + 1)).wv
+        : sign * clamp((await run(fen, { searchmoves: [playedUci] })).info?.whiteCp ?? 0);
+      // Looks like a mistake: confirm with a deeper search of the played move from this position.
+      // Shallow searches miss sacrificial combinations (e.g. Morphy's 15.Bxd7+ in the Opera Game).
+      if (drop(bestScore, playedScore) >= DROP.dubious) {
+        playedScore = sign * clamp((await run(fen, { depth: depth + 4, searchmoves: [playedUci] })).info?.whiteCp ?? 0);
+      }
+    }
+    playedScore = Math.min(playedScore, bestScore);
+    const last = ply > 0 ? moves[ply - 1] : null;
     const s = {
       bestScore, playedScore,
-      secondScore: isBest && top.lines[1] ? score(top.lines[1]) : null,
+      secondScore: isBest && e.lines[1] ? sign * clamp(e.lines[1].whiteCp) : null,
       recapture: !!(mv.captured && last?.captured && last.to === mv.to),
-      sacrifice: bestScore - playedScore <= 15 && isSacrifice(fen, playedUci),
+      sacrifice: drop(bestScore, playedScore) < DROP.top && isSacrifice(fen, playedUci),
     };
     if (s.sacrifice) {
       // Shallow searches over-rate sacrifices; double-check at a greater depth.
       const deep = await run(fen, { depth: depth + 4 });
       s.deepConfirmed = deep.bestmove === playedUci
-        || score(deep.info) - score((await run(fen, { depth: depth + 4, searchmoves: [playedUci] })).info) <= 15;
+        || clamp(sign * (deep.info?.whiteCp ?? 0)) - clamp(sign * ((await run(fen, { depth: depth + 4, searchmoves: [playedUci] })).info?.whiteCp ?? 0)) <= 15;
     }
-    const kind = classify(s);
-    let bestSan = '';
+    let kind = classify(s);
+    // In the first 3 moves each, a shallow browser engine judges offbeat but sound choices
+    // (1.b3, 1...g6) too harshly: only real mistakes count there.
+    if (ply < 6 && kind === 'dubious') kind = 'solid';
     if (!isBest && kind !== 'top') {
-      const t = new Chess(fen);
-      try { bestSan = t.move({ from: top.bestmove.slice(0, 2), to: top.bestmove.slice(2, 4), promotion: top.bestmove[4] }).san; } catch { /* */ }
+      try { entry.best = new Chess(fen).move({ from: e.bestmove.slice(0, 2), to: e.bestmove.slice(2, 4), promotion: e.bestmove[4] }).san; } catch { /* */ }
     }
-    out.push({ ply, san: mv.san, loss: Math.max(0, bestScore - playedScore), best: bestSan, fenBefore: fen, kind });
+    out.push({ ...entry, kind, loss: Math.max(0, bestScore - playedScore), drop: drop(bestScore, playedScore) });
   }
+  onStep?.(plies.length, plies.length);
   return out;
 }
 
@@ -188,13 +230,28 @@ export function moveLabel(ply, san) {
 }
 
 /**
- * Engine results per game URL, shared between the Review tab and the analysis board's game review,
- * so a game is only analysed once per visit. url -> engineCheck() output (every classified move, in order)
+ * Finished reviews per game URL, shared between the Review tab and the analysis board, and kept in
+ * this browser (localStorage) so a game is analysed only once. `full` = the whole game, both sides
+ * (the analysis board's review); otherwise only your moves in the first CHECK_PLIES (the bulk check).
  */
-export const reviewCache = new Map();
+const REVIEW_KEY = 'opening-trainer.reviews.v2', MAX_REVIEWS = 40;
+const reviews = (() => { try { return new Map(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Map(); } })();
 
-/** The dubious moves, mistakes and blunders from engineCheck() output, worst first. */
-export const mistakesOf = (moves) => moves.filter((m) => NEGATIVE.includes(m.kind)).sort((a, b) => b.loss - a.loss);
+/** @returns {{moves:Array, full:boolean}|null} */
+export const getReview = (url) => (url && reviews.get(url)) || null;
+
+export function saveReview(url, moves, full) {
+  if (!url) return;
+  const old = reviews.get(url);
+  if (old?.full && !full) return; // never replace a full review with a partial one
+  reviews.delete(url);
+  reviews.set(url, { moves: moves.map(({ fenBefore, ...m }) => m), full });
+  while (reviews.size > MAX_REVIEWS) reviews.delete(reviews.keys().next().value);
+  try { localStorage.setItem(REVIEW_KEY, JSON.stringify([...reviews])); } catch { /* storage full or blocked */ }
+}
+
+/** Your dubious moves, mistakes and blunders from engineCheck() output, worst first. */
+export const mistakesOf = (moves) => moves.filter((m) => m.mine !== false && NEGATIVE.includes(m.kind)).sort((a, b) => b.drop - a.drop || b.loss - a.loss);
 
 /** Link that opens a game in the analysis board in review mode (it finds and explains your worst move). */
 export function reviewHref(game, dev) {
