@@ -1,11 +1,13 @@
-import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES } from '../chesscom.js';
+import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, reviewCache, reviewHref, mistakesOf } from '../chesscom.js';
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
-import { CLASSES, POSITIVE, NEGATIVE, badgeHtml, encodeClasses } from '../classify.js';
+import { CLASSES, POSITIVE, badgeHtml } from '../classify.js';
 
 const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
+let shownGames = 5; // how many recent games are expanded (kept while the tab is open)
+const FIRST_GAMES = 5, MORE_GAMES = 10;
 
 export function render(root) {
   let alive = true;
@@ -42,6 +44,7 @@ export function render(root) {
   const userEl = $('.user');
   userEl.value = getSettings().chesscomUser || '';
 
+  let refreshRecent = null;
   const pb = $('.progressbar'), pbFill = pb.querySelector('span'), msg = $('.msg'), results = $('.results');
   const setProgress = (p) => { pb.hidden = p === null; pbFill.style.width = `${Math.round((p || 0) * 100)}%`; };
 
@@ -56,6 +59,7 @@ export function render(root) {
     try {
       if (!cache || cache.user !== user.toLowerCase() || cache.months !== months) {
         cache = { user: user.toLowerCase(), months, games: await fetchGames(user, months, setProgress) };
+        shownGames = FIRST_GAMES;
       }
       if (!alive) return;
       setProgress(null);
@@ -81,8 +85,11 @@ export function render(root) {
       <div class="card stat"><div class="n bad">${L}</div><div class="l">losses</div></div>
     </div>`));
 
+    const devs = findDeviations(games);
+    results.appendChild(recentGames(games, devs));
+
     // ---- Repertoire deviations
-    const groups = groupDeviations(findDeviations(games));
+    const groups = groupDeviations(devs);
     const devRows = groups.slice(0, 25).map((d) => {
       const ex = d.expected.map(esc).join(' / ');
       return `<tr>
@@ -132,6 +139,67 @@ export function render(root) {
     ec.querySelector('.run').addEventListener('click', () => runEngine(games, ec));
   }
 
+  /** Badge + count for each class that occurs in a game's engineCheck() output. */
+  const classCounts = (moves) => Object.keys(CLASSES).map((k) => {
+    const n = moves.filter((m) => m.kind === k).length;
+    return n ? `<span>${badgeHtml(k, 'lg')}${n}</span>` : '';
+  }).join('');
+
+  // ---- Recent games: a few at first, "Show more games" expands the list
+  function recentGames(games, devs) {
+    const devBy = new Map(devs.map((d) => [d.game, d]));
+    const card = h(`<div class="card" style="margin-top:12px">
+      <h2 style="margin-top:0">Recent games</h2>
+      <p class="muted" style="margin-top:0">Click a game to open it on the analysis board: Stockfish finds the worst move you played in the opening and explains what was wrong with it.</p>
+      <div class="table-wrap"><table class="recent"><thead><tr><th>Game</th><th>Opening</th><th>Your mistake</th><th></th></tr></thead><tbody></tbody></table></div>
+      <button class="btn more" style="margin-top:10px;width:100%">▾ Show More Games</button>
+    </div>`);
+    const tbody = card.querySelector('tbody'), more = card.querySelector('.more');
+    const row = (g) => {
+      const dev = devBy.get(g);
+      const errs = reviewCache.get(g.url);
+      let issue;
+      if (errs) {
+        const bad = mistakesOf(errs), worst = bad[0];
+        issue = (worst
+          ? `<b>${esc(moveLabel(worst.ply, worst.san))}</b>${badgeHtml(worst.kind)}
+             <div class="muted" style="font-size:.8rem">${CLASSES[worst.kind].label} · better: ${esc(worst.best)}${bad.length > 1 ? ` · +${bad.length - 1} more` : ''}</div>`
+          : '<span class="good">No opening mistakes</span>')
+          + `<div class="class-counts" style="margin-top:4px">${classCounts(errs)}</div>`;
+      } else if (dev) {
+        issue = `<span class="bad"><b>${esc(moveLabel(dev.ply, dev.played))}</b></span>
+          <div class="muted" style="font-size:.8rem">left the book (${esc(dev.expected.join(' / '))})</div>`;
+      } else issue = '<span class="muted">Not checked yet</span>';
+      const res = { W: ['good', 'Won'], D: ['', 'Draw'], L: ['bad', 'Lost'] }[g.result];
+      const href = reviewHref(g, dev);
+      return `<tr class="game-row" data-href="${esc(href)}" tabindex="0" title="Open in analysis">
+        <td><b class="${res[0]}">${res[1]}</b> vs ${esc(g.opponent)} <span class="muted">(${g.oppRating})</span>
+          <div class="muted" style="font-size:.8rem">${g.color === 'w' ? '⚪ White' : '⚫ Black'} · ${esc(g.timeClass)} · ${new Date(g.end).toLocaleDateString()}</div></td>
+        <td>${esc(g.opening)}</td>
+        <td>${issue}</td>
+        <td><a class="btn small" href="${esc(href)}">Review ›</a></td></tr>`;
+    };
+    function fill() {
+      const n = Math.min(shownGames, games.length);
+      tbody.innerHTML = games.slice(0, n).map(row).join('');
+      const left = games.length - n;
+      more.hidden = left <= 0;
+      more.textContent = `▾ Show More Games (${left} more)`;
+    }
+    more.addEventListener('click', () => { shownGames += MORE_GAMES; fill(); });
+    const open = (e) => {
+      const tr = e.target.closest('.game-row');
+      if (!tr || e.target.closest('a')) return;
+      if (e.type === 'keydown' && e.key !== 'Enter') return;
+      location.hash = tr.dataset.href;
+    };
+    tbody.addEventListener('click', open);
+    tbody.addEventListener('keydown', open);
+    fill();
+    refreshRecent = fill;
+    return card;
+  }
+
   async function runEngine(games, ec) {
     const n = Number(ec.querySelector('.n').value);
     const sel = games.slice(0, n);
@@ -141,14 +209,13 @@ export function render(root) {
     const engine = getEngine();
     const total = sel.reduce((a, g) => a + Math.max(0, Math.ceil(Math.min(g.sans.length, CHECK_PLIES) / 2) - 3), 0);
     let done = 0;
-    const found = [], perGame = [];
+    const found = [];
     try {
       for (const g of sel) {
         if (!alive) return;
         const moves = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
-        const game = { ...g, moves };
-        perGame.push(game);
-        moves.forEach((e) => found.push({ ...e, game }));
+        reviewCache.set(g.url, moves);
+        moves.forEach((e) => found.push({ ...e, game: g }));
       }
     } catch (e) {
       if (!alive) return;
@@ -156,37 +223,21 @@ export function render(root) {
       btn.disabled = false; return;
     }
     btn.disabled = false; bar.hidden = true;
-    const order = Object.keys(CLASSES);
-    const reviewUrl = (g, at) => {
-      const keys = g.sans.map(() => null);
-      for (const m of g.moves) keys[m.ply] = m.kind;
-      return `#/analysis?moves=${encodeURIComponent(g.sans.join(' '))}&cls=${encodeClasses(keys)}&at=${at}&side=${g.color}`;
-    };
-    const counts = (moves) => order.map((k) => {
-      const n = moves.filter((m) => m.kind === k).length;
-      return n ? `<span>${badgeHtml(k, 'lg')}${n}</span>` : '';
-    }).join('');
-
-    const gameRows = perGame.map((g) => `<tr>
-      <td><a href="${esc(g.url)}" target="_blank" rel="noopener">vs ${esc(g.opponent)}</a>
-        <div class="muted" style="font-size:.8rem">${esc(g.opening)} · ${new Date(g.end).toLocaleDateString()}</div></td>
-      <td><div class="class-counts">${counts(g.moves) || '<span class="muted">–</span>'}</div></td>
-      <td><a class="btn small" href="${reviewUrl(g, Math.min(g.sans.length, CHECK_PLIES))}">Review</a></td></tr>`).join('');
-
-    // Your best finds first, then your biggest losses.
+    refreshRecent?.();
+    // Your best finds first, then your biggest losses. Each opens the game review at that move.
     const finds = found.filter((e) => POSITIVE.includes(e.kind));
-    const errors = found.filter((e) => NEGATIVE.includes(e.kind)).sort((a, b) => b.loss - a.loss);
+    const errors = mistakesOf(found);
     const moveRow = (e) => `<tr>
-        <td>vs ${esc(e.game.opponent)}<div class="muted" style="font-size:.8rem">${esc(e.game.opening)}</div></td>
+        <td><a href="${esc(e.game.url)}" target="_blank" rel="noopener">vs ${esc(e.game.opponent)}</a>
+          <div class="muted" style="font-size:.8rem">${esc(e.game.opening)} · ${new Date(e.game.end).toLocaleDateString()}</div></td>
         <td>${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}<div class="muted" style="font-size:.8rem">${CLASSES[e.kind].label}</div></td>
         <td>${e.loss >= LOSS_SHOWN ? (e.loss / 100).toFixed(1) : ''}</td>
         <td>${esc(e.best)}</td>
-        <td><a class="btn small" href="${reviewUrl(e.game, e.ply + 1)}">Analyse</a></td>
+        <td><a class="btn small" href="${esc(reviewHref(e.game))}&ply=${e.ply}">Analyse</a></td>
       </tr>`;
     const table = (rows) => `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Move</th><th>Loss</th><th>Better</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Game</th><th>Your moves</th><th></th></tr></thead><tbody>${gameRows}</tbody></table></div>
-      ${finds.length ? `<h3>Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
-      <h3>Biggest losses</h3>
+    out.innerHTML = `${finds.length ? `<h3 style="margin-top:0">Your best finds</h3>${table(finds.map(moveRow).join(''))}` : ''}
+      <h3${finds.length ? '' : ' style="margin-top:0"'}>Biggest losses</h3>
       ${errors.length ? table(errors.slice(0, 30).map(moveRow).join('')) : '<p class="good">No significant opening mistakes found in these games. 👏</p>'}`;
   }
 

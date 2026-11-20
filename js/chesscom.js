@@ -1,7 +1,7 @@
 // Chess.com public API helpers (no login needed – the API is public and CORS-enabled).
 // Docs: https://www.chess.com/news/view/published-data-api
 import { Chess, findBook } from './ui.js';
-import { classify, isSacrifice } from './classify.js';
+import { classify, isSacrifice, NEGATIVE } from './classify.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 const API = 'https://api.chess.com/pub/player/';
@@ -185,4 +185,20 @@ export async function engineCheck(engine, game, { maxPly = CHECK_PLIES, depth = 
 
 export function moveLabel(ply, san) {
   return `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'} ${san}`;
+}
+
+/**
+ * Engine results per game URL, shared between the Review tab and the analysis board's game review,
+ * so a game is only analysed once per visit. url -> engineCheck() output (every classified move, in order)
+ */
+export const reviewCache = new Map();
+
+/** The dubious moves, mistakes and blunders from engineCheck() output, worst first. */
+export const mistakesOf = (moves) => moves.filter((m) => NEGATIVE.includes(m.kind)).sort((a, b) => b.loss - a.loss);
+
+/** Link that opens a game in the analysis board in review mode (it finds and explains your worst move). */
+export function reviewHref(game, dev) {
+  const q = new URLSearchParams({ moves: game.sans.join(' '), review: game.color, url: game.url, vs: game.opponent });
+  if (dev) { q.set('dev', dev.ply); q.set('book', dev.expected.join(',')); }
+  return '#/analysis?' + q.toString();
 }
