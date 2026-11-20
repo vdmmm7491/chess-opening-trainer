@@ -124,6 +124,16 @@ export function recordQuiz(openingId, score, total) {
 }
 export function quizStats(openingId) { return state.quiz?.[openingId] || null; }
 
+/** When you first practised in the trainer (ms), or null if you haven't yet. */
+export function startedLearning() {
+  const times = Object.keys(state.days).filter((d) => state.days[d] > 0).map((d) => {
+    const [y, m, dd] = d.split('-').map(Number);
+    return new Date(y, m - 1, dd).getTime();
+  });
+  for (const e of state.history) times.push(e.t);
+  return times.length ? Math.min(...times) : null;
+}
+
 export function activityDays() { return state.days; }
 export function history() { return state.history; }
 

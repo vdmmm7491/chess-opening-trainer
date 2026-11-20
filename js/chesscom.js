@@ -31,6 +31,23 @@ export async function fetchGames(username, months, onProgress) {
   return games.map((g) => parseGame(g, user)).filter(Boolean);
 }
 
+// One shared download per account, so the Review and Progress tabs don't fetch the same games twice.
+let gamesCache = null; // { user, months, games }
+
+/** fetchGames() with a cache. A shorter period is cut from a longer download (by calendar month). */
+export async function loadGames(username, months, onProgress) {
+  const user = username.trim().toLowerCase();
+  if (gamesCache && gamesCache.user === user && gamesCache.months >= months) {
+    if (gamesCache.months === months) return gamesCache.games;
+    const cut = new Date();
+    cut.setHours(0, 0, 0, 0); cut.setDate(1); cut.setMonth(cut.getMonth() - months + 1);
+    return gamesCache.games.filter((g) => g.end >= cut.getTime());
+  }
+  const games = await fetchGames(user, months, onProgress);
+  gamesCache = { user, months, games };
+  return games;
+}
+
 export function parseGame(g, user) {
   const color = g.white.username.toLowerCase() === user ? 'w' : g.black.username.toLowerCase() === user ? 'b' : null;
   if (!color) return null;
