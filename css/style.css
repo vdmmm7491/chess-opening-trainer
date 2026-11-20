@@ -346,8 +346,13 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .sq-badge .mbadge { width: 100%; height: 100%; margin: 0; font-size: 52cqh; animation: badge-pop 0.18s ease-out; }
 @keyframes badge-pop { from { transform: translateY(-30%) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sq-badge .mbadge { animation: none; } }
-.class-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); }
-.class-legend span { display: inline-flex; align-items: center; }
+.class-key { margin: 4px 0 10px; }
+.class-key summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--link); width: fit-content; }
+.class-key ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px 16px; }
+.class-key li { display: flex; align-items: flex-start; gap: 2px; font-size: 0.85rem; line-height: 1.35; }
+.class-key li .mbadge { margin-top: 1px; }
+.class-key li span { color: var(--muted); }
+.class-key li b { color: var(--text); margin-right: 4px; }
 .class-counts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.85rem; }
 .class-counts span { display: inline-flex; align-items: center; }
 
@@ -406,3 +411,36 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .game-view .gmoves { max-height: 150px; }
   .game-view .gc-body { min-height: 0; }
 }
+/* Progress: "What to learn next" */
+.learn-item { padding: 12px 0; border-top: 1px solid var(--border); }
+.learn-item:first-child { border-top: 0; padding-top: 0; }
+.learn-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-bottom: 4px; }
+.learn-sugg { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.learn-sugg li { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; line-height: 1.4; }
+.learn-actions { margin-top: 6px; }
+
+/* Progress: win rate since you started training */
+:root { --series-1: #3b82f6; --series-2: #d9752f; }
+:root[data-theme="light"] { --series-1: #2563eb; --series-2: #c2410c; }
+.tag.suggest { background: var(--accent); color: #fff; }
+.wr-chart { margin-top: 12px; }
+.wr-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+.wr-legend span, .wr-tip div { display: inline-flex; align-items: center; gap: 6px; }
+.wr-legend i, .wr-tip i { width: 12px; height: 4px; border-radius: 2px; display: inline-block; }
+.wr-legend i.wr-dash { height: 0; border-left: 0; border-top: 2px dashed var(--muted); }
+.wr-tip div { display: flex; }
+.wr-plot { position: relative; width: 100%; touch-action: pan-y; }
+.wr-plot svg { display: block; overflow: visible; }
+.wr-grid { stroke: var(--border); stroke-width: 1; }
+.wr-grid.half { stroke: var(--muted); stroke-dasharray: 2 3; opacity: .6; }
+.wr-axis { fill: var(--muted); font-size: 11px; }
+.wr-axis.strong { fill: var(--text); font-weight: 600; }
+.wr-label { fill: var(--text); font-size: 12px; font-weight: 600; }
+.wr-before { fill: var(--panel-2); opacity: .55; }
+.wr-start { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.wr-cross { stroke: var(--muted); stroke-width: 1; }
+.wr-dot { stroke: var(--panel); stroke-width: 2; }
+.wr-tip { position: absolute; top: 0; z-index: 2; pointer-events: none; background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: .82rem; box-shadow: var(--shadow); display: grid; gap: 2px; white-space: nowrap; }
+.wr-tip[hidden] { display: none; }
+.wr-table { margin-top: 8px; }

@@ -1,8 +1,8 @@
-import { fetchGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, reviewCache, reviewHref, mistakesOf } from '../chesscom.js';
+import { loadGames, openingStats, findDeviations, groupDeviations, engineCheck, moveLabel, CHECK_PLIES, getReview, saveReview, reviewHref, mistakesOf } from '../chesscom.js';
 import { getSettings, setSetting } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { h, esc } from '../ui.js';
-import { CLASSES, POSITIVE, badgeHtml } from '../classify.js';
+import { CLASSES, POSITIVE, badgeHtml, legendHtml } from '../classify.js';
 
 const LOSS_SHOWN = 30; // don't print a loss for best/book moves
 let cache = null; // { user, months, games } kept while the tab is open
@@ -58,7 +58,7 @@ export function render(root) {
     setProgress(0);
     try {
       if (!cache || cache.user !== user.toLowerCase() || cache.months !== months) {
-        cache = { user: user.toLowerCase(), months, games: await fetchGames(user, months, setProgress) };
+        cache = { user: user.toLowerCase(), months, games: await loadGames(user, months, setProgress) };
         shownGames = FIRST_GAMES;
       }
       if (!alive) return;
@@ -84,6 +84,10 @@ export function render(root) {
       <div class="card stat"><div class="n">${D}</div><div class="l">draws</div></div>
       <div class="card stat"><div class="n bad">${L}</div><div class="l">losses</div></div>
     </div>`));
+
+    results.appendChild(h(`<div class="card" style="margin-top:12px">
+      <b>What to learn next</b> and <b>how your results changed since you started training</b> are on the
+      <a href="#/progress">Progress</a> page.</div>`));
 
     const devs = findDeviations(games);
     results.appendChild(recentGames(games, devs));
@@ -126,8 +130,9 @@ export function render(root) {
     // ---- Engine check
     const ec = h(`<div class="card" style="margin-top:12px">
       <h2 style="margin-top:0">Stockfish opening check</h2>
-      <p class="muted" style="margin-top:0">Runs Stockfish over the first 12 moves of your most recent games and rates each of your moves.</p>
-      <div class="class-legend" style="margin-bottom:10px">${Object.entries(CLASSES).map(([k, c]) => `<span title="${esc(c.desc)}">${badgeHtml(k, 'lg')}${c.label}</span>`).join('')}</div>
+      <p class="muted" style="margin-top:0">Runs Stockfish over the first ${CHECK_PLIES / 2} moves of your most recent games and rates each of your moves.
+        To rate a whole game, both sides, click it in Recent games.</p>
+      ${legendHtml()}
       <div class="form-row">
         <select class="input n"><option value="5">Last 5 games</option><option value="10" selected>Last 10 games</option><option value="20">Last 20 games</option></select>
         <button class="btn primary run">Run engine check</button>
@@ -141,7 +146,7 @@ export function render(root) {
 
   /** Badge + count for each class that occurs in a game's engineCheck() output. */
   const classCounts = (moves) => Object.keys(CLASSES).map((k) => {
-    const n = moves.filter((m) => m.kind === k).length;
+    const n = moves.filter((m) => m.mine !== false && m.kind === k).length;
     return n ? `<span>${badgeHtml(k, 'lg')}${n}</span>` : '';
   }).join('');
 
@@ -150,21 +155,22 @@ export function render(root) {
     const devBy = new Map(devs.map((d) => [d.game, d]));
     const card = h(`<div class="card" style="margin-top:12px">
       <h2 style="margin-top:0">Recent games</h2>
-      <p class="muted" style="margin-top:0">Click a game to open it on the analysis board: Stockfish finds the worst move you played in the opening and explains what was wrong with it.</p>
+      <p class="muted" style="margin-top:0">Click a game to open it on the analysis board: Stockfish rates every move of the game and explains your worst one.</p>
+      ${legendHtml()}
       <div class="table-wrap"><table class="recent"><thead><tr><th>Game</th><th>Opening</th><th>Your mistake</th><th></th></tr></thead><tbody></tbody></table></div>
       <button class="btn more" style="margin-top:10px;width:100%">▾ Show More Games</button>
     </div>`);
     const tbody = card.querySelector('tbody'), more = card.querySelector('.more');
     const row = (g) => {
       const dev = devBy.get(g);
-      const errs = reviewCache.get(g.url);
+      const errs = getReview(g.url)?.moves;
       let issue;
       if (errs) {
         const bad = mistakesOf(errs), worst = bad[0];
         issue = (worst
           ? `<b>${esc(moveLabel(worst.ply, worst.san))}</b>${badgeHtml(worst.kind)}
              <div class="muted" style="font-size:.8rem">${CLASSES[worst.kind].label} · better: ${esc(worst.best)}${bad.length > 1 ? ` · +${bad.length - 1} more` : ''}</div>`
-          : '<span class="good">No opening mistakes</span>')
+          : '<span class="good">No mistakes</span>')
           + `<div class="class-counts" style="margin-top:4px">${classCounts(errs)}</div>`;
       } else if (dev) {
         issue = `<span class="bad"><b>${esc(moveLabel(dev.ply, dev.played))}</b></span>
@@ -205,17 +211,22 @@ export function render(root) {
     const sel = games.slice(0, n);
     const btn = ec.querySelector('.run');
     const bar = ec.querySelector('.progressbar'), fill = bar.querySelector('span'), out = ec.querySelector('.ec-out');
-    btn.disabled = true; bar.hidden = false; out.innerHTML = '<p class="muted">Analysing… this takes roughly 10 seconds per game (longer on phones).</p>';
+    btn.disabled = true; bar.hidden = false; out.innerHTML = '<p class="muted">Analysing… this takes a few seconds per game (longer on phones). Games you already reviewed are instant.</p>';
     const engine = getEngine();
-    const total = sel.reduce((a, g) => a + Math.max(0, Math.ceil(Math.min(g.sans.length, CHECK_PLIES) / 2) - 3), 0);
-    let done = 0;
     const found = [];
     try {
-      for (const g of sel) {
+      for (let i = 0; i < sel.length; i++) {
         if (!alive) return;
-        const moves = await engineCheck(engine, g, { onStep: () => { done++; fill.style.width = `${(done / total) * 100}%`; } });
-        reviewCache.set(g.url, moves);
-        moves.forEach((e) => found.push({ ...e, game: g }));
+        const g = sel[i];
+        const step = (done, total) => { fill.style.width = `${((i + (total ? done / total : 1)) / sel.length) * 100}%`; };
+        let moves = getReview(g.url)?.moves;
+        if (moves) step(1, 1);
+        else {
+          moves = await engineCheck(engine, g, { maxPly: CHECK_PLIES, onStep: step });
+          saveReview(g.url, moves, false);
+        }
+        // A full review also has the rest of the game: keep to the same opening window here.
+        moves.filter((e) => e.mine !== false && e.ply < CHECK_PLIES).forEach((e) => found.push({ ...e, game: g }));
       }
     } catch (e) {
       if (!alive) return;
@@ -245,6 +256,7 @@ export function render(root) {
   userEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
   $('.tc').addEventListener('change', () => { if (cache) show(); });
   if (cache && cache.user === userEl.value.trim().toLowerCase()) show();
+  else if (userEl.value.trim()) load(); // your saved Chess.com account: analyse it straight away
 
   return () => { alive = false; getEngine().stop(); };
 }

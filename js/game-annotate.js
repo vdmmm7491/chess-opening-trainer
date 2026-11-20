@@ -5,7 +5,7 @@ import { Chess, findBook } from './ui.js';
 import { classifyMove } from './chesscom.js';
 
 const KEY = 'opening-trainer.famous-games.v1';
-const VERSION = 2; // bump when the method changes, so old results are redone
+const VERSION = 3; // bump when the method changes, so old results are redone
 export const ANNOTATE_DEPTH = 12;
 
 function loadAll() {

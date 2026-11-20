@@ -9,15 +9,22 @@ const TARGET_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" 
 export const CLASSES = {
   masterstroke: { label: 'Masterstroke', symbol: '!!', color: 'linear-gradient(135deg,#ffd76a,#e0a106)', fg: '#3a2900', desc: 'A sound sacrifice: the best move, and it gives up material.' },
   only:         { label: 'Only move',    symbol: '!',  color: '#7c4dff', desc: 'The only move that keeps the position: every other move is clearly worse.' },
-  top:          { label: 'Top move',     symbol: TARGET_ICON, color: '#1f8a70', desc: "Stockfish's choice, or within 0.3 pawns of it." },
-  solid:        { label: 'Solid',        symbol: '✓',  color: '#5b8a3c', desc: 'Close to the best move.' },
+  top:          { label: 'Top move',     symbol: TARGET_ICON, color: '#1f8a70', desc: "Stockfish's choice, or practically as good." },
+  solid:        { label: 'Solid',        symbol: '✓',  color: '#5b8a3c', desc: 'A good move, just slightly less accurate than the best one.' },
   theory:       { label: 'Theory',       symbol: BOOK_ICON, color: '#64748b', desc: "A move from the trainer's repertoire." },
-  dubious:      { label: 'Dubious',      symbol: '?!', color: '#f08c00', desc: 'Loses a little (1.2–2.2 pawns).' },
-  mistake:      { label: 'Mistake',      symbol: '?',  color: '#e0531f', desc: 'Loses a lot (2.2–3.5 pawns).' },
-  blunder:      { label: 'Blunder',      symbol: '??', color: '#c62828', desc: 'Loses more than 3.5 pawns.' },
+  dubious:      { label: 'Dubious',      symbol: '?!', color: '#f08c00', desc: 'Gives away some of your chances (in a level position, roughly 1–2 pawns).' },
+  mistake:      { label: 'Mistake',      symbol: '?',  color: '#e0531f', desc: 'Gives away a lot (in a level position, roughly 2–3.5 pawns).' },
+  blunder:      { label: 'Blunder',      symbol: '??', color: '#c62828', desc: 'Throws the position away: a big swing towards your opponent.' },
 };
 export const POSITIVE = ['masterstroke', 'only'];
 export const NEGATIVE = ['dubious', 'mistake', 'blunder'];
+
+/** "Key to the move labels": every badge with what it means. Open by default when `open` is true. */
+export function legendHtml(open = false) {
+  return `<details class="class-key"${open ? ' open' : ''}><summary>Key to the move labels</summary>
+    <ul>${Object.entries(CLASSES).map(([k, c]) => `<li>${badgeHtml(k, 'lg')}<span><b>${c.label}</b> ${c.desc}</span></li>`).join('')}</ul>
+  </details>`;
+}
 
 /** Badge for a class key. `extra` adds CSS classes (e.g. 'lg'). */
 export function badgeHtml(key, extra = '') {
@@ -26,12 +33,17 @@ export function badgeHtml(key, extra = '') {
   return `<span class="mbadge ${extra}" style="--mb:${c.color};--mb-fg:${c.fg || '#fff'}" title="${c.label}" aria-label="${c.label}">${c.symbol}</span>`;
 }
 
-// Thresholds in centipawns lost compared with the engine's best move.
-export const LOSS = { good: 30, inaccuracy: 120, mistake: 220, blunder: 350 };
-const TOP = 15; // within this of the best move counts as playing the best move
-
 /** Expected score (0..1) for the side to move, from a centipawn evaluation. */
 export const winProb = (cp) => 1 / (1 + Math.exp(-0.00368 * cp));
+
+// Thresholds on the expected score you give away compared with the engine's best move. Using
+// expected score rather than raw pawns means dropping from +12 to +8 in a won position isn't a
+// "blunder", while dropping from +1 to -1 is. In a level position the steps are about 0.3, 1.2,
+// 2.2 and 3.5 pawns.
+export const DROP = { top: 0.03, dubious: 0.1, mistake: 0.18, blunder: 0.28 };
+
+/** Expected score lost by playing `playedScore` instead of `bestScore` (centipawns, mover's view). */
+export const drop = (bestScore, playedScore) => Math.max(0, winProb(bestScore) - winProb(playedScore));
 
 /**
  * Classify one move. Scores are centipawns from the mover's point of view.
@@ -39,11 +51,11 @@ export const winProb = (cp) => 1 / (1 + Math.exp(-0.00368 * cp));
  *          deepConfirmed?:boolean, recapture?:boolean}} s
  */
 export function classify(s) {
-  const loss = s.bestScore - s.playedScore;
-  if (loss >= LOSS.blunder) return 'blunder';
-  if (loss >= LOSS.mistake) return 'mistake';
-  if (loss >= LOSS.inaccuracy) return 'dubious';
-  if (loss > TOP) return loss >= LOSS.good ? 'solid' : 'top';
+  const d = drop(s.bestScore, s.playedScore);
+  if (d >= DROP.blunder) return 'blunder';
+  if (d >= DROP.mistake) return 'mistake';
+  if (d >= DROP.dubious) return 'dubious';
+  if (d >= DROP.top) return 'solid';
   // You played the best move (or as good as). Was it special?
   if (s.sacrifice && s.deepConfirmed && s.playedScore >= -100) return 'masterstroke';
   if (isOnlyMove(s)) return 'only';
