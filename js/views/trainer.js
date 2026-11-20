@@ -13,7 +13,6 @@ export function render(root, { id, query }) {
   if (!opening) { root.appendChild(h('<p>Opening not found. <a href="#/">Back</a></p>')); return; }
 
   let mode = query.mode === 'learn' ? 'learn' : 'practice';
-  let fixedLine = query.line !== undefined && query.line !== '' ? Number(query.line) : null;
   const userColor = opening.side;
   const settings = getSettings();
   if (settings.coach === undefined) setSetting('coach', true);
@@ -30,12 +29,16 @@ export function render(root, { id, query }) {
           <button class="btn small" data-mode="practice">Practice</button>
           <a class="btn small quiz-link" href="#/quiz/${opening.id}">🧩 Quiz</a>
         </div>
-        <select class="input line-select" aria-label="Line">
-          <option value="">Auto – spaced repetition</option>
-          ${opening.lines.map((l, i) => `<option value="${i}">${i + 1}. ${esc(l.name)}</option>`).join('')}
-        </select>
+      </div>
+      <div class="lines-backdrop"></div>
+      <div class="card lines-card" role="dialog" aria-label="Choose a line">
+        <div class="lines-head"><b>📖 Choose a line</b><span class="muted">${opening.lines.length} lines</span>
+          <button class="btn small lines-close" aria-label="Close">✕</button></div>
+        <div class="line-list"></div>
       </div>
       <div class="card status-card">
+        <button class="line-current" type="button" aria-haspopup="dialog">
+          <span class="lc-label">📖</span><span class="lc-name"></span><span class="lc-change">Change line ▾</span></button>
         <div class="status"></div>
         <div class="muted line-info" style="font-size:.85rem;margin:6px 0"></div>
         <div class="movelist"></div>
@@ -147,6 +150,13 @@ export function render(root, { id, query }) {
     board.setArrows([{ from: m.from, to: m.to }]);
   }
 
+  /** Hint: highlight the piece that has to move, without showing where it goes. */
+  function showHint(san) {
+    const m = new Chess(chess.fen()).move(san);
+    board.setArrows([]);
+    board.setHints([m.from]);
+  }
+
   function updateButtons() {
     view.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('primary', b.dataset.mode === mode));
     $('[data-act="hint"]').disabled = busy || phase !== 'book' || chess.turn() !== userColor;
@@ -165,7 +175,8 @@ export function render(root, { id, query }) {
     moves = lineMoves(opening.lines[idx]);
     chess = new Chess();
     mistakes = 0; tries = 0; phase = 'book'; busy = false;
-    $('.line-select').value = fixedLine === null ? '' : String(fixedLine);
+    openLines(false);
+    renderLineList();
     const st = lineStats(opening.id, idx);
     lineInfoEl.textContent = `Line ${idx + 1}/${opening.lines.length}: ${opening.lines[idx].name}` +
       (st ? ` · practised ${st.attempts}× · level ${st.box}/5` : ' · new');
@@ -175,22 +186,32 @@ export function render(root, { id, query }) {
     else promptUser();
   }
 
+  // ---------------- Line picker ----------------
+  function renderLineList() {
+    const list = $('.line-list');
+    list.innerHTML = opening.lines.map((l, i) => {
+      const st = lineStats(opening.id, i);
+      const meta = !st ? '<span class="li-new">New</span>'
+        : `<span class="li-level" title="Level ${st.box}/5">${'●'.repeat(st.box)}${'○'.repeat(5 - st.box)}</span>`;
+      return `<button type="button" class="line-item${i === lineIdx ? ' cur' : ''}" data-line="${i}">
+        <span class="li-num">${i + 1}</span><span class="li-name">${esc(l.name)}</span>${meta}</button>`;
+    }).join('');
+    $('.lc-name').innerHTML = `<b>Line ${lineIdx + 1}/${opening.lines.length}</b> ${esc(opening.lines[lineIdx].name)}`;
+    const cur = list.querySelector('.cur');
+    if (cur) list.scrollTop = cur.offsetTop - list.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2;
+  }
+  function openLines(open) {
+    $('.lines-card').classList.toggle('open', open);
+    $('.lines-backdrop').classList.toggle('open', open);
+    if (open) renderLineList();
+  }
+
   function promptUser() {
     const ply = chess.history().length;
     if (mode === 'learn') {
       setStatus(`Play <b>${esc(moves[ply])}</b> (shown with the arrow).`);
       if (coachOn()) coachPush(explainEntry(chess.history(), moves[ply], 'next'));
     } else setStatus('Your move. What\'s the book move here?');
-  }
-
-  /** Lines of this opening that match the current history. */
-  function matchingLines(hist) {
-    const out = [];
-    opening.lines.forEach((l, i) => {
-      const mv = lineMoves(l);
-      if (mv.length > hist.length && hist.every((s, k) => mv[k] === s)) out.push({ i, mv });
-    });
-    return out;
   }
 
   function userMove(from, to, promo) {
@@ -204,23 +225,13 @@ export function render(root, { id, query }) {
     const ply = histBefore.length;
     const expected = moves[ply];
     if (m.san !== expected) {
-      const sib = fixedLine === null ? matchingLines(histBefore).find((x) => x.mv[ply] === m.san && x.i !== lineIdx) : null;
-      if (sib) {
-        lineIdx = sib.i; moves = sib.mv;
-        lineInfoEl.textContent = `Line ${sib.i + 1}/${opening.lines.length}: ${opening.lines[sib.i].name}`;
-      } else {
-        chess.undo();
-        if (tries === 0) mistakes++;
-        tries++;
-        board.flash();
-        const bookSans = fixedLine === null
-          ? [...new Set(matchingLines(histBefore).map((x) => x.mv[ply]))]
-          : [expected];
-        if (!bookSans.includes(expected)) bookSans.unshift(expected);
-        if (coachOn()) coachMistake(fenBefore, m, bookSans, expected);
-        else wrongMoveStatus(m.san, expected);
-        return;
-      }
+      chess.undo();
+      if (tries === 0) mistakes++;
+      tries++;
+      board.flash();
+      if (coachOn()) coachMistake(fenBefore, m, [expected], expected);
+      else wrongMoveStatus(m.san, expected);
+      return;
     }
     tries = 0;
     sync();
@@ -397,13 +408,12 @@ export function render(root, { id, query }) {
         const ply = chess.history().length;
         if (tries === 0) mistakes++;
         tries = Math.max(tries, 1);
-        showArrow(moves[ply]);
-        setStatus(`Hint: play <b>${esc(moves[ply])}</b>.`);
-        if (coachOn()) coachPush(explainEntry(chess.history(), moves[ply], 'next'));
+        showHint(moves[ply]);
+        setStatus('Hint: move the highlighted piece.');
         break;
       }
       case 'restart': start(lineIdx); break;
-      case 'next': start(fixedLine !== null ? fixedLine : pickLine(opening, lineIdx)); break;
+      case 'next': start((lineIdx + 1) % opening.lines.length); break;
       case 'playon':
         phase = 'free';
         coachToken++;
@@ -417,10 +427,13 @@ export function render(root, { id, query }) {
       case 'flip': board.flip(); bar.setOrientation(board.orientation); break;
     }
   });
-  $('.line-select').addEventListener('change', (e) => {
-    fixedLine = e.target.value === '' ? null : Number(e.target.value);
-    start(fixedLine !== null ? fixedLine : pickLine(opening));
+  $('.line-list').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-line]');
+    if (b) start(Number(b.dataset.line));
   });
+  $('.line-current').addEventListener('click', () => openLines(true));
+  $('.lines-close').addEventListener('click', () => openLines(false));
+  $('.lines-backdrop').addEventListener('click', () => openLines(false));
   const toggle = $('.evaltoggle');
   toggle.checked = settings.evalBar;
   toggle.addEventListener('change', () => { setSetting('evalBar', toggle.checked); evaluate(); });
@@ -428,7 +441,9 @@ export function render(root, { id, query }) {
   ctoggle.checked = coachOn();
   ctoggle.addEventListener('change', () => { setSetting('coach', ctoggle.checked); coachRender(); });
 
-  start(fixedLine !== null ? fixedLine : pickLine(opening));
+  const firstLine = Number(query.line);
+  start(query.line !== undefined && query.line !== '' && firstLine >= 0 && firstLine < opening.lines.length
+    ? firstLine : pickLine(opening));
 
   return () => { alive = false; coachToken++; timers.forEach(clearTimeout); analyser.cancel(); phase = 'gone'; };
 }

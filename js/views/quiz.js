@@ -51,10 +51,10 @@ export function render(root, { id }) {
   const all = quizPositions(opening);
   const userColor = opening.side;
 
-  const view = h(`<div class="play-layout">
+  const view = h(`<div class="play-layout quiz-view">
     <div><div class="board-wrap"><div class="board"></div></div></div>
     <aside class="side">
-      <div class="card">
+      <div class="card quiz-intro">
         <div class="kv" style="align-items:center"><h1 style="margin:0">🧩 ${esc(opening.name)} quiz</h1>
           <span class="tag ${userColor}">You play ${userColor === 'w' ? 'White' : 'Black'}</span></div>
         <p class="muted" style="margin:8px 0 0;font-size:.9rem">Random positions from all ${opening.lines.length} lines (move 3 onwards). Find the book move. You get one try.</p>
@@ -64,6 +64,7 @@ export function render(root, { id }) {
         </div>
       </div>
       <div class="card status-card">
+        <div class="quiz-head"><b>🧩 ${esc(opening.name)}</b><span class="tag ${userColor}">${userColor === 'w' ? 'White' : 'Black'}</span></div>
         <div class="quiz-progress"><span class="q-num"></span><span class="q-score"></span><span class="quiz-best muted"></span></div>
         <div class="bar" style="margin:8px 0"><span class="q-bar" style="width:0"></span></div>
         <div class="status"></div>
@@ -73,11 +74,14 @@ export function render(root, { id }) {
         <div class="coach-head"><span class="coach-avatar">🎓</span><b>Coach</b></div>
         <div class="coach-body"><p class="muted">Find the book move. I'll explain the answer afterwards.</p></div>
       </div>
-      <div class="card btn-row">
+      <nav class="card btn-row quiz-actions" aria-label="Quiz actions">
         <button class="btn small primary" data-act="next" disabled>Next question →</button>
+        <button class="btn small" data-act="hint">💡 Hint</button>
         <button class="btn small" data-act="restart">↺ New round</button>
         <button class="btn small" data-act="flip">⇅ Flip</button>
-      </div>
+        <a class="btn small quiz-tab" href="#/train/${opening.id}?mode=learn">📖 Learn</a>
+        <a class="btn small quiz-tab" href="#/train/${opening.id}?mode=practice">🎯 Practice</a>
+      </nav>
     </aside>
   </div>`);
   root.appendChild(view);
@@ -85,7 +89,7 @@ export function render(root, { id }) {
   const coachBody = $('.coach-body');
 
   let chess = new Chess();
-  let questions = [], qi = 0, score = 0, answered = false;
+  let questions = [], qi = 0, score = 0, answered = false, hinted = false;
   const board = new Board($('.board'), {
     orientation: userColor,
     getDests: destsFn(chess),
@@ -105,6 +109,7 @@ export function render(root, { id }) {
 
   function showQuestion() {
     answered = false;
+    hinted = false;
     const q = questions[qi];
     chess = new Chess();
     q.history.forEach((s) => chess.move(s));
@@ -112,6 +117,7 @@ export function render(root, { id }) {
     board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
     board.setArrows([]);
     renderMoveList($('.movelist'), q.history);
+    $('.movelist').scrollLeft = $('.movelist').scrollWidth; // phones: one-row strip, show the newest move
     $('.q-num').textContent = `Question ${qi + 1} / ${questions.length}`;
     $('.q-score').textContent = `Score ${score}`;
     $('.q-bar').style.width = `${(qi / questions.length) * 100}%`;
@@ -119,6 +125,17 @@ export function render(root, { id }) {
     setStatus(`${userColor === 'w' ? 'White' : 'Black'} to move after <b>${esc(moveNo(last, q.history[last]))}</b>. What's the book move?`);
     coachBody.innerHTML = `<p class="muted">From the line${q.lines.size > 1 ? 's' : ''}: ${esc([...q.lines].join(', '))}.</p>`;
     $('[data-act="next"]').disabled = true;
+    $('[data-act="hint"]').disabled = false;
+  }
+
+  /** Hint: highlight the piece to move. A hinted answer scores no point. */
+  function hint() {
+    if (answered || !questions.length) return;
+    const m = new Chess(chess.fen()).move([...questions[qi].answers][0]);
+    hinted = true;
+    board.setHints([m.from]);
+    $('[data-act="hint"]').disabled = true;
+    setStatus('Hint: move the highlighted piece. A hinted answer scores no point.');
   }
 
   function answer(from, to, promo) {
@@ -127,13 +144,14 @@ export function render(root, { id }) {
     let m;
     try { m = chess.move({ from, to, promotion: promo || 'q' }); } catch { return; }
     answered = true;
+    $('[data-act="hint"]').disabled = true;
     const correct = q.answers.has(m.san);
     const right = correct ? m.san : [...q.answers][0];
     if (correct) {
-      score++;
+      if (!hinted) score++;
       board.getDests = destsFn(chess);
       board.setFen(chess.fen(), { from: m.from, to: m.to }, checkSquare(chess));
-      setStatus(`✓ <b>${esc(m.san)}</b> is right!`, 'good');
+      setStatus(`✓ <b>${esc(m.san)}</b> is right!${hinted ? ' (with a hint, so no point)' : ''}`, 'good');
     } else {
       chess.undo();
       board.flash();
@@ -150,6 +168,8 @@ export function render(root, { id }) {
       ${n.note ? `<p class="coach-idea">${esc(n.note)}</p>` : ''}</div>`).join('');
     $('.q-score').textContent = `Score ${score}`;
     $('.q-bar').style.width = `${((qi + 1) / questions.length) * 100}%`;
+    // Phones: make sure the whole explanation sits above the fixed bottom bar.
+    if (matchMedia('(max-width: 900px)').matches) $('.coach').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     const nextBtn = $('[data-act="next"]');
     nextBtn.disabled = false;
     nextBtn.textContent = qi + 1 < questions.length ? 'Next question →' : 'See result';
@@ -163,6 +183,7 @@ export function render(root, { id }) {
     coachBody.innerHTML = `<div class="coach-entry"><div class="coach-title">Round finished</div>
       <p>Best score: <b>${stats.best} / ${stats.bestOf}</b> · rounds played: ${stats.rounds}</p></div>`;
     $('[data-act="next"]').disabled = true;
+    $('[data-act="hint"]').disabled = true;
     $('.q-num').textContent = 'Finished';
     $('.quiz-best').textContent = `Best: ${stats.best} / ${stats.bestOf}`;
   }
@@ -171,6 +192,7 @@ export function render(root, { id }) {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.act === 'next') { if (qi + 1 < questions.length) { qi++; showQuestion(); } else finish(); }
+    if (b.dataset.act === 'hint') hint();
     if (b.dataset.act === 'restart') newRound();
     if (b.dataset.act === 'flip') board.flip();
   });

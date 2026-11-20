@@ -164,6 +164,13 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .sq.d { background: var(--dark-sq); }
 .sq.last::before, .sq.sel::before { content: ""; position: absolute; inset: 0; background: var(--hl); }
 .sq.check::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,40,40,0.95) 0%, rgba(255,40,40,0.5) 40%, rgba(255,40,40,0) 75%); }
+/* Hint: highlights the piece to move without showing where it goes. */
+.sq.hint::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: rgba(72, 180, 240, 0.45); box-shadow: inset 0 0 0 4px rgba(72, 180, 240, 0.95);
+  animation: hint-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes hint-pulse { from { opacity: 0.5; } to { opacity: 1; } }
 .sq .mark { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.8; }
 .sq.dot::after {
   content: ""; position: absolute; left: 50%; top: 50%; width: 32%; height: 32%;
@@ -218,7 +225,29 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .engine-line { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; color: var(--muted); word-break: break-word; }
 .toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; cursor: pointer; }
 .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
-.line-select { width: 100%; }
+/* line picker: a list in the side panel on desktop, a bottom-sheet popup on phones */
+.lines-card { display: flex; flex-direction: column; gap: 10px; border: 2px solid color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.lines-head { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
+.lines-head .muted { font-size: 0.85rem; margin-left: auto; }
+.lines-close { display: none; }
+.line-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; position: relative; padding-right: 2px; }
+.line-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; min-height: 48px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; background: var(--panel-2); color: var(--text); font: inherit; font-weight: 600;
+}
+.line-item:hover { background: var(--panel-hover); }
+.line-item.cur { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+.li-num {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); color: var(--muted); font-size: 0.85rem; font-weight: 800;
+}
+.line-item.cur .li-num { background: var(--accent); color: #fff; }
+.li-name { flex: 1; min-width: 0; line-height: 1.25; }
+.li-new { flex: none; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--warn); }
+.li-level { flex: none; font-size: 0.7rem; letter-spacing: 1px; color: var(--accent); }
+.line-current { display: none; }
+.lines-backdrop { display: none; }
 .kv { display: flex; justify-content: space-between; font-size: 0.92rem; padding: 3px 0; gap: 8px; }
 
 /* ---------- quiz ---------- */
@@ -233,6 +262,9 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .quiz-progress { display: flex; gap: 14px; align-items: baseline; font-weight: 700; font-size: 0.95rem; }
 .quiz-progress .q-score { color: var(--good); }
 .quiz-progress .quiz-best { margin-left: auto; font-weight: 400; font-size: 0.85rem; }
+/* Opening name line inside the status card and the Learn/Practice tabs: phones only. */
+.quiz-head { display: none; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.quiz-actions .quiz-tab { display: none; }
 
 /* ---------- coach ---------- */
 .coach { border-left: 4px solid var(--accent); }
@@ -306,6 +338,8 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .piece-preview span { flex: 1; aspect-ratio: 1; background: center/90% no-repeat; }
 .piece-preview span.l { background-color: var(--light-sq); } .piece-preview span.d { background-color: var(--dark-sq); }
 
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
   .play-layout { grid-template-columns: 1fr; gap: 10px; }
@@ -314,10 +348,58 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .side .status-card { order: -2; }
   .side .coach { order: -1; }
   .side .status-card .status { min-height: 0; }
+
+  /* Line picker: a big "Change line" button under the board opens a bottom sheet. */
+  .line-current {
+    display: flex; align-items: center; gap: 10px; width: 100%; margin: -2px 0 10px; text-align: left;
+    padding: 10px 12px; min-height: 52px; border-radius: 10px; cursor: pointer; font: inherit; color: var(--text);
+    border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  }
+  .line-current .lc-label { font-size: 1.3rem; }
+  .line-current .lc-name { flex: 1; min-width: 0; line-height: 1.25; font-size: 0.95rem; }
+  .line-current .lc-name b { display: block; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .line-current .lc-change {
+    flex: none; padding: 7px 12px; border-radius: 8px; background: var(--accent); color: #fff;
+    font-weight: 700; font-size: 0.85rem; box-shadow: 0 3px 0 var(--accent-shadow);
+  }
+  .status-card .line-info { display: none; }
+  .lines-card { display: none; }
+  .lines-card.open {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; max-height: 80svh;
+    border-radius: 16px 16px 0 0; padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.45); animation: sheet-up 0.18s ease-out;
+  }
+  .lines-card.open .line-list { max-height: none; flex: 1; }
+  .lines-card.open .line-item { min-height: 54px; font-size: 1rem; }
+  .lines-close { display: inline-flex; }
+  .lines-backdrop.open { display: block; position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,0.55); }
   /* Long game scores: a short scrolling strip so the explanation stays on screen. */
   .status-card .movelist { max-height: 76px; }
   /* Only the newest coach message, so it fits on screen. */
   .coach-body .coach-entry:not(:first-child) { display: none; }
+
+  /* Quiz on phones/tablets: opening name, moves and coach stay on screen, and the
+     buttons become a tab bar fixed to the bottom so Next never needs a scroll. */
+  body:has(.quiz-view) { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .play-layout.quiz-view { grid-template-columns: minmax(0, 1fr); }
+  .quiz-view .board-wrap { max-width: max(240px, min(100%, calc(100svh - 460px))); }
+  .quiz-view .quiz-intro { display: none; }
+  .quiz-view .quiz-head { display: flex; }
+  .quiz-view .status-card { padding: 10px 12px; }
+  .quiz-view .status-card .bar { margin: 6px 0 !important; height: 6px; }
+  .quiz-view .status { font-size: 0.95rem; }
+  /* Moves on one swipeable row (scrolled to the newest move). */
+  .quiz-view .movelist { flex-wrap: nowrap; white-space: nowrap; overflow-x: auto; max-height: none; scrollbar-width: none; }
+  .quiz-view .coach { padding: 10px 12px; scroll-margin-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .quiz-view .coach-head { margin-bottom: 4px; }
+  .quiz-view .quiz-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0;
+    display: grid; grid-template-columns: 1.5fr repeat(5, minmax(0, 1fr)); gap: 6px;
+    border-radius: 0; border-width: 1px 0 0; padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    box-shadow: 0 -6px 20px rgba(0,0,0,0.3);
+  }
+  .quiz-view .quiz-actions .btn { padding: 4px; font-size: 0.74rem; line-height: 1.15; min-height: 44px; text-align: center; }
+  .quiz-view .quiz-actions .quiz-tab { display: inline-flex; }
 }
 @media (max-width: 640px) {
   .app { padding: 10px 8px; }

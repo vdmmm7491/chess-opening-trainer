@@ -61,7 +61,8 @@ export class Board {
     this.lastMove = null;
     this.checkSq = null;
     this.selected = null;
-    this.arrows = [];      // arrows set by the app (hints, engine)
+    this.hints = [];       // squares the app highlights as a hint (cleared by setFen)
+    this.arrows = [];      // arrows set by the app (answers, engine)
     this.userArrows = [];  // arrows drawn by the user
     this.marks = {};       // square -> colour key, drawn by the user
     this.preview = null;   // arrow being drawn
@@ -102,6 +103,7 @@ export class Board {
     this.lastMove = lastMove;
     this.checkSq = checkSq;
     this.selected = null;
+    this.hints = [];
     this.renderPieces();
     this.renderHighlights();
   }
@@ -113,6 +115,9 @@ export class Board {
   }
 
   flip() { this.setOrientation(this.orientation === 'w' ? 'b' : 'w'); }
+
+  /** Hint highlight on squares, e.g. the piece that should move. Cleared by setFen. */
+  setHints(squares) { this.hints = squares || []; this.renderHighlights(); }
 
   /** App-controlled arrows: [{from, to, color?: 'green'|'blue'|'orange'|'red'|css}] */
   setArrows(arrows) { this.arrows = arrows || []; this.renderArrows(); }
@@ -147,6 +152,7 @@ export class Board {
     for (const [sq, div] of Object.entries(this.squares)) {
       div.classList.toggle('last', !!this.lastMove && (this.lastMove.from === sq || this.lastMove.to === sq));
       div.classList.toggle('sel', this.selected === sq);
+      div.classList.toggle('hint', this.hints.includes(sq));
       div.classList.toggle('check', this.checkSq === sq);
       const isDest = dests.includes(sq);
       div.classList.toggle('dot', isDest && !this.pieces[sq]);
