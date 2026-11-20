@@ -346,8 +346,13 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .sq-badge .mbadge { width: 100%; height: 100%; margin: 0; font-size: 52cqh; animation: badge-pop 0.18s ease-out; }
 @keyframes badge-pop { from { transform: translateY(-30%) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sq-badge .mbadge { animation: none; } }
-.class-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); }
-.class-legend span { display: inline-flex; align-items: center; }
+.class-key { margin: 4px 0 10px; }
+.class-key summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--link); width: fit-content; }
+.class-key ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px 16px; }
+.class-key li { display: flex; align-items: flex-start; gap: 2px; font-size: 0.85rem; line-height: 1.35; }
+.class-key li .mbadge { margin-top: 1px; }
+.class-key li span { color: var(--muted); }
+.class-key li b { color: var(--text); margin-right: 4px; }
 .class-counts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.85rem; }
 .class-counts span { display: inline-flex; align-items: center; }
 

@@ -18,7 +18,7 @@ A **free**, open-source website for practising chess openings. Works on phones a
   - harmless alternatives are labelled "Playable" instead of being treated as blunders
   - the coach is for the opening only. It switches off in free play after the book ends
 - **Stockfish evaluation bar**: Stockfish 10 runs in your browser in a Web Worker. The best engine line is hidden while you practise so it doesn't give away the answer.
-- **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list.
+- **Analysis board**: best-move arrow, engine line, book detection, play vs Stockfish, load a FEN or move list, and **Rate moves** to label every move of the game on the board.
 - **Openings by rating**: every opening is tagged with the levels it suits (Beginner under 1000, Intermediate 1000–1600, Advanced 1600–2000, Expert 2000+) and a note explaining why. Pick a level or type in your rating to filter.
 - **Board you can draw on**: right-click and drag to draw arrows (knight moves get L-shaped arrows), right-click a square to highlight it. Hold Shift, Ctrl or Alt for green, red or blue. Left-click clears them.
 - **Appearance settings** (⚙ in the top bar): 5 piece sets, 7 board colours, dark or light theme.
@@ -28,7 +28,8 @@ A **free**, open-source website for practising chess openings. Works on phones a
 - **Game review** (Review tab): enter a Chess.com username to download public games through Chess.com's public API (no login needed). Your username is remembered and your games load as soon as you open the tab. You get:
   - win/draw/loss by opening, as White and as Black
   - **the moves where you left your repertoire**, with a "Drill" button for that line
-  - a **Stockfish opening check** that rates each of your moves in the first 12 moves of recent games, with our own labels: Masterstroke `!!`, Only move `!`, Top move, Solid, Theory, Dubious `?!`, Mistake `?` and Blunder `??`. Each game opens on the analysis board with the badges shown on the moves
+  - a **Stockfish opening check** that rates each of your moves in the first 15 moves of recent games, with our own labels: Masterstroke `!!`, Only move `!`, Top move, Solid, Theory, Dubious `?!`, Mistake `?` and Blunder `??` (a key explains each one)
+  - **game review**: click a game and Stockfish rates every move of it, both sides, then explains your worst move. Reviews are remembered in your browser, so a game is only analysed once
 
 ## Run it locally
 
