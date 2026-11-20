@@ -2,8 +2,8 @@ import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
-import { engineCheck, reviewCache, moveLabel, mistakesOf, CHECK_PLIES } from '../chesscom.js';
-import { CLASSES, badgeHtml } from '../classify.js';
+import { engineCheck, getReview, saveReview, moveLabel, mistakesOf } from '../chesscom.js';
+import { CLASSES, badgeHtml, legendHtml } from '../classify.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -26,10 +26,17 @@ export function render(root, { query }) {
   const review = query.review === 'w' || query.review === 'b' ? query.review : null;
   let reviewBusy = false; // the review owns the engine; the live analyser waits
   let reviewToken = 0, animToken = 0, alive = true;
-  // Move classifications from the review (ply -> class key). They apply while the moves still match the game.
+  // Move ratings (ply -> class key) from the review or the "Rate moves" button. They apply while the
+  // moves still match the ones that were rated.
   let classes = [];
   const gameSans = sans.slice();
-  const classOf = (i) => (classes[i] && sans.slice(0, i + 1).every((s, k) => s === gameSans[k]) ? classes[i] : null);
+  let ratedSans = gameSans;
+  const classOf = (i) => (classes[i] && sans.slice(0, i + 1).every((s, k) => s === ratedSans[k]) ? classes[i] : null);
+  const setRatings = (moves, forSans) => {
+    classes = [];
+    for (const m of moves) classes[m.ply] = m.kind;
+    ratedSans = forSans.slice();
+  };
 
   const view = h(`<div class="play-layout">
     <div>
@@ -56,7 +63,10 @@ export function render(root, { query }) {
         <div class="btn-row" style="margin-top:10px">
           <button class="btn small" data-act="flip">⇅ Flip</button>
           <button class="btn small" data-act="reset">New</button>
+          ${review ? '' : '<button class="btn small" data-act="rate" title="Stockfish rates every move: Top move, Mistake, Blunder…">★ Rate moves</button>'}
         </div>
+        <div class="rate-status muted" style="font-size:.85rem;margin-top:6px" hidden></div>
+        <div class="key-wrap" style="margin-top:8px" hidden>${legendHtml()}</div>
       </div>
       <div class="card">
         <div class="kv"><span>Play against Stockfish</span></div>
@@ -104,8 +114,9 @@ export function render(root, { query }) {
     board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
     const cur = cursor > 0 ? classOf(cursor - 1) : null;
     board.setBadge(cur && lastMoveOf(chess)?.to, cur && badgeHtml(cur));
-    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1,
-      sans.map((_, i) => badgeHtml(classOf(i))));
+    const badges = sans.map((_, i) => badgeHtml(classOf(i)));
+    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1, badges);
+    $('.key-wrap').hidden = !badges.some(Boolean);
     bar.setOrientation(board.orientation);
     bar.setVisible(getSettings().evalBar !== false);
     const showArrow = $('.arrow').checked && !enginePlays;
@@ -150,10 +161,12 @@ export function render(root, { query }) {
       case 'fwd': cursor = Math.min(sans.length, cursor + 1); break;
       case 'last': cursor = sans.length; break;
       case 'flip': board.flip(); break;
-      case 'reset': startFen = START; sans = []; cursor = 0; break;
+      case 'reset': startFen = START; sans = []; cursor = 0; classes = []; break;
+      case 'rate': rateMoves(); return;
       case 'load': {
         const v = $('.fen').value.trim();
         if (!v) return;
+        classes = [];
         try {
           new Chess(v); startFen = v; sans = []; cursor = 0;
         } catch {
@@ -176,6 +189,27 @@ export function render(root, { query }) {
   };
   window.addEventListener('keydown', onKey);
 
+  // ---------------- Rate moves (free analysis) ----------------
+  async function rateMoves() {
+    if (reviewBusy || !sans.length) return;
+    const btn = view.querySelector('[data-act=rate]'), status = $('.rate-status');
+    const forSans = sans.slice();
+    reviewBusy = true;
+    analyser.cancel();
+    btn.disabled = true; status.hidden = false;
+    let moves = null;
+    try {
+      moves = await engineCheck(engine, { sans: forSans, startFen }, {
+        onStep: (done, total) => { status.textContent = `Rating moves… ${Math.round((total ? done / total : 1) * 100)}%`; },
+      });
+    } catch { moves = null; }
+    if (!alive) return;
+    reviewBusy = false; btn.disabled = false;
+    if (moves) { setRatings(moves, forSans); status.hidden = true; }
+    else status.textContent = 'Rating was interrupted. Try again.';
+    sync();
+  }
+
   // ---------------- Game review ----------------
   const fenAt = (ply) => { const c = new Chess(startFen); for (const s of sans.slice(0, ply)) c.move(s); return c.fen(); };
   const uciToSan = (fen, u) => { try { return new Chess(fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] }).san; } catch { return ''; } };
@@ -184,18 +218,20 @@ export function render(root, { query }) {
   async function startReview() {
     const el = $('.review');
     const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
-    let errs = query.url ? reviewCache.get(query.url) : null;
+    const saved = getReview(query.url);
+    let errs = saved?.full ? saved.moves : null;
     if (!errs) {
       reviewBusy = true;
       analyser.cancel();
-      el.innerHTML = `${title}<p class="muted"><span class="spinner"></span> Stockfish is checking your opening moves…</p>
+      el.innerHTML = `${title}<p class="muted"><span class="spinner"></span> Stockfish is rating every move of the game… <span class="pct"></span></p>
         <div class="progressbar"><span></span></div>`;
-      const fill = el.querySelector('.progressbar span');
-      const total = Math.max(1, Math.ceil(Math.min(sans.length, CHECK_PLIES) / 2) - 3);
-      let done = 0;
+      const fill = el.querySelector('.progressbar span'), pct = el.querySelector('.pct');
       try {
-        errs = await engineCheck(engine, { sans: gameSans, color: review }, { onStep: () => { fill.style.width = `${(++done / total) * 100}%`; } });
-        if (query.url) reviewCache.set(query.url, errs);
+        errs = await engineCheck(engine, { sans: gameSans, color: review }, {
+          both: true,
+          onStep: (done, total) => { const f = total ? done / total : 1; fill.style.width = `${f * 100}%`; pct.textContent = `${Math.round(f * 100)}%`; },
+        });
+        saveReview(query.url, errs, true);
       } catch { errs = null; }
       if (!alive) return;
       reviewBusy = false;
@@ -205,8 +241,7 @@ export function render(root, { query }) {
         return;
       }
     }
-    classes = [];
-    for (const m of errs) classes[m.ply] = m.kind;
+    setRatings(errs, gameSans);
     items = mistakesOf(errs).map((e) => ({ ...e, bookSans: e.best ? [e.best] : null }));
     const dev = query.dev !== undefined ? Number(query.dev) : null;
     if (dev !== null && sans[dev] && !items.some((e) => e.ply === dev)) {
@@ -218,8 +253,8 @@ export function render(root, { query }) {
       target = items.find((e) => e.ply === p) || (sans[p] ? { ...errs.find((e) => e.ply === p), ply: p, san: sans[p], kind: 'Move', cls: classes[p] } : target);
     }
     if (!target) {
-      el.innerHTML = `${title}<p class="good">No significant mistakes in your first ${CHECK_PLIES / 2} moves. 👏</p>
-        <p class="muted" style="margin-bottom:0">Step through the game with ◀ ▶ to look at the rest.</p>`;
+      el.innerHTML = `${title}<p class="good">No significant mistakes in this game. 👏</p>
+        <p class="muted" style="margin-bottom:0">Step through the game with ◀ ▶ to see how each move was rated.</p>`;
       cursor = sans.length; rebuild(); sync();
       return;
     }
