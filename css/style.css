@@ -673,16 +673,17 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .trainer-view .board-col {
     display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 0 auto;
     /* leave room under the board for the coach and the buttons */
-    max-width: max(360px, min(680px, calc(100vh - 500px)));
+    max-width: 880px; /* coach and buttons use the full width, so they stay short */
   }
-  .trainer-view .board-col .board-wrap { max-width: 100%; }
+  /* the board itself shrinks with the window height to leave room for the coach */
+  .trainer-view .board-col .board-wrap { max-width: max(360px, min(680px, calc(100vh - 470px))); }
   .trainer-view .board-col .card { padding: 10px 12px; }
   .trainer-view .coach-head { margin-bottom: 4px; }
   /* only the newest coach message, so the panel stays short */
   .trainer-view .coach-body .coach-entry:not(:first-child) { display: none; }
 }
 @media (min-width: 1100px) {
-  .trainer-view .board-col { max-width: max(380px, min(860px, calc(100vh - 520px))); }
+  .trainer-view .board-col .board-wrap { max-width: max(380px, min(860px, calc(100vh - 480px))); }
 }
 @media (max-width: 900px) {
   /* phones: one column — board, move status, coach, buttons, then the rest */
@@ -708,3 +709,6 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .trainer-view .trainer-actions { flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .trainer-view .trainer-actions .btn { padding: 6px 9px; white-space: nowrap; flex: 1 1 auto; }
 }
+/* coach: refutation line and Replay / Try again on one row */
+.ref-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.ref-line .coach-btns { display: inline-flex; gap: 6px; margin-left: auto; }

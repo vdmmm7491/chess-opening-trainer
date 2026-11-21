@@ -316,12 +316,15 @@ export function render(root, { id, query }) {
       <div class="coach-title"><span class="kind kind-${res.kind.toLowerCase()}">${playable ? 'Not the book move' : res.kind}</span> ${esc(moveNo(ply, played.san))}</div>
       ${playable ? bookBlock : ''}
       ${verdict}
-      ${res.steps.length && !playable ? `<div class="ref-line"><span class="muted">What can happen:</span> ${line}</div>` : ''}
-      ${playable ? '' : bookBlock}
-      <div class="btn-row" style="margin-top:10px">
-        ${res.steps.length && !playable ? '<button class="btn small" data-coach="replay">▶ Replay</button>' : ''}
-        <button class="btn small primary" data-coach="retry">↺ Try again</button>
-      </div>
+      ${(() => {
+        // Replay / Try again sit on the same row as the refutation line, so the coach stays short.
+        const btns = `<span class="coach-btns">
+          ${res.steps.length && !playable ? '<button class="btn small" data-coach="replay">▶ Replay</button>' : ''}
+          <button class="btn small primary" data-coach="retry">↺ Try again</button></span>`;
+        return res.steps.length && !playable
+          ? `<div class="ref-line"><span class="ref-moves"><span class="muted">What can happen:</span> ${line}</span>${btns}</div>${bookBlock}`
+          : `${playable ? '' : bookBlock}<div class="ref-line">${btns}</div>`;
+      })()}
     </div>`;
     coachBody.querySelector('[data-coach="retry"]').addEventListener('click', () => retry(expected));
     coachBody.querySelector('[data-coach="replay"]')?.addEventListener('click', () => playRefutation(res, played));
