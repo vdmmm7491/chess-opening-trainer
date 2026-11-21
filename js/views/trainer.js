@@ -23,8 +23,25 @@ export function render(root, { id, query }) {
   const entry = (idx) => lines.find((x) => x.idx === idx);
   const posOf = (idx) => lines.findIndex((x) => x.idx === idx) + 1;
 
-  const view = h(`<div class="play-layout">
-    <div><div class="board-wrap"><div class="board"></div></div></div>
+  // Desktop: coach and buttons sit right under the board so everything fits one screen.
+  // Phones: board-col and side become `display: contents` and CSS `order` sets the sequence.
+  const view = h(`<div class="play-layout trainer-view">
+    <div class="board-col">
+      <div class="board-wrap"><div class="board"></div></div>
+      <div class="card coach">
+        <div class="coach-head"><span class="coach-avatar">🎓</span><b>Coach</b>
+          <label class="toggle" style="margin-left:auto"><input type="checkbox" class="coachtoggle"> On</label></div>
+        <div class="coach-body"></div>
+      </div>
+      <div class="card btn-row trainer-actions">
+        <button class="btn small" data-act="hint">💡 Hint</button>
+        <button class="btn small" data-act="restart">↺ Restart</button>
+        <button class="btn small primary" data-act="next">Next line →</button>
+        <button class="btn small" data-act="playon" title="Play on against Stockfish">▶ Play on</button>
+        <button class="btn small" data-act="analyse" title="Open this position in analysis">🔍 Analyse</button>
+        <button class="btn small" data-act="flip">⇅ Flip</button>
+      </div>
+    </div>
     <aside class="side">
       <div class="card">
         <div class="kv" style="align-items:center"><h1 style="margin:0">${esc(opening.name)}</h1>
@@ -38,35 +55,22 @@ export function render(root, { id, query }) {
           ${PUNISH[opening.id]?.length ? `<a class="btn small" href="#/punish/${opening.id}">⚔️ Punish</a>` : ''}
         </div>
       </div>
-      <div class="lines-backdrop"></div>
-      <div class="card lines-card" role="dialog" aria-label="Choose a line">
-        <div class="lines-head"><b>📖 Choose a line</b><span class="muted lines-count"></span>
-          <button class="btn small lines-close" aria-label="Close">✕</button></div>
-        <div class="line-list"></div>
-      </div>
       <div class="card status-card">
         <button class="line-current" type="button" aria-haspopup="dialog">
           <span class="lc-label">📖</span><span class="lc-name"></span><span class="lc-change">Change line ▾</span></button>
         <div class="status"></div>
         <div class="muted line-info" style="font-size:.85rem;margin:6px 0"></div>
         <div class="movelist"></div>
+        <div class="eval-row">
+          <label class="toggle"><input type="checkbox" class="evaltoggle"> Show evaluation bar</label>
+          <div class="engine-line"></div>
+        </div>
       </div>
-      <div class="card coach">
-        <div class="coach-head"><span class="coach-avatar">🎓</span><b>Coach</b>
-          <label class="toggle" style="margin-left:auto"><input type="checkbox" class="coachtoggle"> On</label></div>
-        <div class="coach-body"></div>
-      </div>
-      <div class="card btn-row">
-        <button class="btn small" data-act="hint">💡 Hint</button>
-        <button class="btn small" data-act="restart">↺ Restart</button>
-        <button class="btn small primary" data-act="next">Next line →</button>
-        <button class="btn small" data-act="playon">Play on vs Stockfish</button>
-        <button class="btn small" data-act="analyse">Open in analysis</button>
-        <button class="btn small" data-act="flip">⇅ Flip</button>
-      </div>
-      <div class="card">
-        <label class="toggle"><input type="checkbox" class="evaltoggle"> Show evaluation bar</label>
-        <div class="engine-line" style="margin-top:8px"></div>
+      <div class="lines-backdrop"></div>
+      <div class="card lines-card" role="dialog" aria-label="Choose a line">
+        <div class="lines-head"><b>📖 Choose a line</b><span class="muted lines-count"></span>
+          <button class="btn small lines-close" aria-label="Close">✕</button></div>
+        <div class="line-list"></div>
       </div>
     </aside>
   </div>`);

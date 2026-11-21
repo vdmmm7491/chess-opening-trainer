@@ -667,3 +667,44 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .board-wrap, .board-nav { max-width: min(960px, calc(100vh - 150px)); }
   .corner-card { width: 420px; }
 }
+
+/* ---------- trainer: coach and buttons under the board, one screen ---------- */
+@media (min-width: 901px) {
+  .trainer-view .board-col {
+    display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 0 auto;
+    /* leave room under the board for the coach and the buttons */
+    max-width: max(360px, min(680px, calc(100vh - 500px)));
+  }
+  .trainer-view .board-col .board-wrap { max-width: 100%; }
+  .trainer-view .board-col .card { padding: 10px 12px; }
+  .trainer-view .coach-head { margin-bottom: 4px; }
+  /* only the newest coach message, so the panel stays short */
+  .trainer-view .coach-body .coach-entry:not(:first-child) { display: none; }
+}
+@media (min-width: 1100px) {
+  .trainer-view .board-col { max-width: max(380px, min(860px, calc(100vh - 520px))); }
+}
+@media (max-width: 900px) {
+  /* phones: one column — board, move status, coach, buttons, then the rest */
+  .trainer-view .board-col, .trainer-view .side { display: contents; }
+  .trainer-view .board-wrap { order: 0; }
+  .trainer-view .side .status-card { order: 1; }
+  .trainer-view .coach { order: 2; }
+  .trainer-view .trainer-actions { order: 3; }
+  .trainer-view .side > .card:not(.status-card) { order: 4; }
+}
+.trainer-view .eval-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.trainer-view .eval-row .engine-line { margin-top: 4px; }
+.trainer-view .eval-row .engine-line:empty { display: none; }
+@media (min-width: 901px) {
+  /* right column never taller than the window: the line list takes what's left and scrolls */
+  .trainer-view .side { position: sticky; top: 10px; max-height: calc(100vh - 150px); }
+  .trainer-view .side > .card:first-child { padding-bottom: 6px; }
+  .trainer-view .side > .card:first-child .btn-row { margin: 8px 0 !important; }
+  .trainer-view .lines-card { flex: 1 1 auto; min-height: 150px; }
+  .trainer-view .lines-card .line-list { max-height: none; flex: 1 1 auto; min-height: 0; }
+}
+@media (min-width: 901px) {
+  .trainer-view .trainer-actions { flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .trainer-view .trainer-actions .btn { padding: 6px 9px; white-space: nowrap; flex: 1 1 auto; }
+}
