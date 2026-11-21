@@ -119,9 +119,7 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .opening-card p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
 .level-box { margin-bottom: 14px; }
 .level-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
-.rating-input { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
-.rating-input .input { width: 110px; }
-.level-chips { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.level-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .level-chip {
   --lvl: var(--muted);
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
@@ -133,8 +131,7 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .level-chip b { font-size: 0.95rem; }
 .level-chip span { font-size: 0.8rem; color: var(--muted); }
 .level-chip.active { border-color: var(--lvl); background: color-mix(in srgb, var(--lvl) 18%, var(--panel-2)); }
-.level-chip[data-level="all"].active { border-color: var(--accent); }
-.level-title { margin-top: 4px; }
+.level-blurb { margin: 10px 0 0; font-size: 0.88rem; }
 .lvl-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .lvl {
   --lvl: var(--muted);
@@ -145,7 +142,6 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .opening-card .level-note { font-size: 0.85rem; color: var(--text); opacity: 0.85; }
 @media (max-width: 760px) {
   .level-chips { grid-template-columns: repeat(2, 1fr); }
-  .level-chip[data-level="all"] { grid-column: 1 / -1; }
 }
 .bar { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
@@ -164,6 +160,8 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .pbar.pulse .bar.progress { animation: pbar-pulse .9s ease-out; }
 @keyframes pbar-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
 .trainer-progress { margin-top: 4px; }
+.trainer-level { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: 0.85rem; }
+.trainer-level .input { padding: 4px 8px; font-size: 0.85rem; }
 
 /* ---------- board layout ---------- */
 .play-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; align-items: start; }
@@ -626,3 +624,46 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .backbtn:hover { background: var(--panel-hover); }
 .backbtn span { font-size: 1.1em; line-height: 1; }
 @media (max-width: 640px) { .backbtn { margin-bottom: 8px; } }
+
+/* ---------- level chips: rating range ---------- */
+.level-chip .level-range { color: var(--text); font-weight: 600; opacity: 0.85; }
+
+/* ---------- phones/tablets: no quote widget ---------- */
+@media (max-width: 900px) {
+  .corner { display: none !important; }
+}
+
+/* ---------- larger desktop screens: scale everything up ---------- */
+@media (min-width: 1100px) {
+  html { font-size: 17px; }
+  .app { max-width: 1480px; padding: 22px 24px; }
+  .topbar { padding: 12px 24px; }
+  .brand { font-size: 1.3rem; }
+  .brand img { width: 40px; height: 40px; }
+  .nav { gap: 6px; }
+  .nav a, .nav button.icon { padding: 10px 16px; font-size: 1.08rem; }
+  h1 { font-size: 1.85rem; }
+  h2 { font-size: 1.3rem; }
+  .card { padding: 18px; }
+  .btn { min-height: 44px; padding: 10px 16px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+  .play-layout { grid-template-columns: minmax(0, 1fr) 420px; gap: 24px; }
+  .board-wrap, .board-nav { max-width: min(860px, calc(100vh - 150px)); }
+  .evalbar .label { font-size: 12px; }
+  .coach-body { font-size: 1rem; }
+  .corner { right: 24px; bottom: 24px; }
+  .corner-card { width: 380px; padding: 18px 20px 16px; font-size: 1rem; }
+  .corner-fab { transform: scale(1.2); transform-origin: bottom right; }
+  .corner-quote blockquote { font-size: 1.08rem; line-height: 1.5; }
+  .corner-quote figcaption { font-size: 0.92rem; }
+  .corner-meta, .corner-why { font-size: 0.88rem; }
+  .corner-src { font-size: 0.8rem; }
+  .tutorial-fab { height: 52px; font-size: 1.02rem; }
+}
+@media (min-width: 1600px) {
+  html { font-size: 18px; }
+  .app { max-width: 1640px; }
+  .play-layout { grid-template-columns: minmax(0, 1fr) 460px; }
+  .board-wrap, .board-nav { max-width: min(960px, calc(100vh - 150px)); }
+  .corner-card { width: 420px; }
+}

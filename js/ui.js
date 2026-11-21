@@ -22,7 +22,7 @@ export function esc(s) {
 export function progressBar(p, { label = true } = {}) {
   const pct = Math.round(p.value * 100);
   const playedPct = p.total ? (p.played / p.total) * 100 : 0;
-  const tip = `${p.played}/${p.total} lines played · ${p.learned} learned (level 3+) · ${pct}% overall`;
+  const tip = `${p.played}/${p.total} lines played · ${p.learned} learned (strength 3+) · ${pct}% overall`;
   return `<div class="pbar" title="${tip}">
     ${label ? `<div class="pbar-text"><span>${p.played}/${p.total} lines played${p.learned ? ` · ${p.learned} learned` : ''}</span><b class="pbar-pct">${pct}%</b></div>` : ''}
     <div class="bar progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${tip}">

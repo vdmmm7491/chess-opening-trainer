@@ -1,5 +1,5 @@
-import { OPENINGS, getOpening } from '../openings.js';
-import { summary, openingProgress, lineProgress, lineStats, activityDays, history, exportJson, importJson, resetAll, today, mastery, getSettings, setSetting } from '../progress.js';
+import { OPENINGS, LEVELS, getOpening, linesFor } from '../openings.js';
+import { summary, openingProgress, lineProgress, lineStats, activityDays, history, exportJson, importJson, resetAll, today, mastery, getSettings, setSetting, getLevel } from '../progress.js';
 import { h, esc, progressBar } from '../ui.js';
 import { loadGames } from '../chesscom.js';
 import { recommend, levelName, prettyFamily } from '../recommend.js';
@@ -13,7 +13,7 @@ export function render(root) {
       <div class="card stat"><div class="n">${s.streak}</div><div class="l">day streak 🔥</div></div>
       <div class="card stat"><div class="n">${s.attempts}</div><div class="l">lines practised</div></div>
       <div class="card stat"><div class="n">${Math.round(s.accuracy * 100)}%</div><div class="l">perfect runs</div></div>
-      <div class="card stat"><div class="n">${s.learned}</div><div class="l">lines learned (level 3+)</div></div>
+      <div class="card stat"><div class="n">${s.learned}</div><div class="l">lines learned (strength 3+)</div></div>
     </div>
   </section>`));
 
@@ -37,19 +37,19 @@ export function render(root) {
   // Per-opening table: only the openings you've started (completed at least one line in Practice)
   const started = OPENINGS.map((o) => ({ o, p: openingProgress(o) })).filter(({ p }) => p.played > 0);
   const rows = started.map(({ o, p }) => {
-    const lines = o.lines.map((l, i) => {
+    const lines = linesFor(o, getLevel()).map(({ idx: i, name }) => {
       const st = lineStats(o.id, i);
       const lp = Math.round(lineProgress(o.id, i) * 100);
       const due = st && st.due > Date.now() ? `review in ${Math.ceil((st.due - Date.now()) / 86400000)}d` : '<span class="warn">due</span>';
-      return `<div class="kv"><a href="#/train/${o.id}?mode=practice&line=${i}">${esc(l.name)}</a>
-        <span class="muted">${st ? `${lp}% · lvl ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : 'not started'}</span></div>`;
+      return `<div class="kv"><a href="#/train/${o.id}?mode=practice&line=${i}">${esc(name)}</a>
+        <span class="muted">${st ? `${lp}% · strength ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : 'not started'}</span></div>`;
     }).join('');
     return `<tr><td><b>${esc(o.name)}</b> <span class="tag ${o.side}">${o.side === 'w' ? 'W' : 'B'}</span>
       <div style="margin-top:6px">${progressBar(p)}</div>
       <details style="margin-top:6px"><summary class="muted">Lines</summary>${lines}</details></td>
       <td style="width:70px">${Math.round(p.value * 100)}%</td></tr>`;
   }).join('');
-  const table = h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Your openings</h2>
+  const table = h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Your openings <span class="muted" style="font-size:.85rem;font-weight:400">· ${esc(LEVELS[getLevel()].name)} level</span></h2>
     ${started.length
       ? `<p class="muted" style="margin-top:0">${started.length} of ${OPENINGS.length} openings started.</p>
         <div class="table-wrap"><table><thead><tr><th>Opening</th><th>Mastery</th></tr></thead><tbody>${rows}</tbody></table></div>`
@@ -60,7 +60,7 @@ export function render(root) {
   const hist = history().slice(0, 15).map((e) => {
     const o = getOpening(e.id);
     if (!o) return '';
-    return `<tr><td>${new Date(e.t).toLocaleString()}</td><td>${esc(o.name)} – ${esc(o.lines[e.line]?.name || '')}</td>
+    return `<tr><td>${new Date(e.t).toLocaleString()}</td><td>${esc(o.name)} – ${esc(o.lines[e.line]?.name || '')}${LEVELS[e.level] ? ` <span class="muted">· ${esc(LEVELS[e.level].name)}</span>` : ''}</td>
       <td class="${e.mistakes ? 'bad' : 'good'}">${e.mistakes ? e.mistakes + ' mistake' + (e.mistakes > 1 ? 's' : '') : 'perfect'}</td></tr>`;
   }).join('');
   root.appendChild(h(`<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Recent sessions</h2>
@@ -159,7 +159,7 @@ function learnNextSection(isAlive) {
 export function learnNextList(games) {
   const { level, items } = recommend(games, { mastery });
   const wrap = h('<div></div>');
-  if (level) wrap.appendChild(h(`<p class="muted" style="margin:0 0 8px">Picked for your level: <b>${esc(levelName(level.level))}</b> (~${level.rating}).</p>`));
+  if (level) wrap.appendChild(h(`<p class="muted" style="margin:0 0 8px">Picked for your level: <b>${esc(levelName(level.level))}</b>, based on your recent games.</p>`));
   if (!items.length) {
     wrap.appendChild(h('<p class="good">No weak spots: there is no opening you\'ve lost to twice or more while scoring under 50%. 👏</p>'));
     return wrap;

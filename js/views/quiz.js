@@ -1,6 +1,6 @@
 // Quiz: random positions from one opening (move 3 onwards); find the book move.
-import { getOpening, lineMoves } from '../openings.js';
-import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { getOpening, linesFor } from '../openings.js';
+import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK, getLevel } from '../progress.js';
 import { Board } from '../board.js';
 import { noteFor } from '../coach.js';
 import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from '../ui.js';
@@ -8,18 +8,17 @@ import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from 
 const ROUND = 10;
 const moveNo = (ply, san) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
 
-/** Every position in the opening where it's your move, from move 3 on, with all book answers. */
-export function quizPositions(opening) {
+/** Every position in the opening (at your level) where it's your move, from move 3 on, with all book answers. */
+export function quizPositions(opening, level = getLevel()) {
   const map = new Map();
-  opening.lines.forEach((line) => {
-    const mv = lineMoves(line);
+  linesFor(opening, level).forEach(({ moves: mv, name }) => {
     for (let ply = 4; ply < mv.length; ply++) { // ply 4 = move 3 for White; ply 5 = move 3 for Black
       const myTurn = (ply % 2 === 0) === (opening.side === 'w');
       if (!myTurn) continue;
       const key = mv.slice(0, ply).join(' ');
       const e = map.get(key) || { history: mv.slice(0, ply), answers: new Set(), lines: new Set() };
       e.answers.add(mv[ply]);
-      e.lines.add(line.name);
+      e.lines.add(name);
       map.set(key, e);
     }
   });
@@ -57,7 +56,7 @@ export function render(root, { id }) {
       <div class="card quiz-intro">
         <div class="kv" style="align-items:center"><h1 style="margin:0">🧩 ${esc(opening.name)} quiz</h1>
           <span class="tag ${userColor}">You play ${userColor === 'w' ? 'White' : 'Black'}</span></div>
-        <p class="muted" style="margin:8px 0 0;font-size:.9rem">Random positions from all ${opening.lines.length} lines (move 3 onwards). Find the book move. You get one try.</p>
+        <p class="muted" style="margin:8px 0 0;font-size:.9rem">Random positions from all ${linesFor(opening, getLevel()).length} lines at your level (move 3 onwards). Find the book move. You get one try.</p>
         <div class="btn-row" style="margin-top:10px">
           <a class="btn small" href="#/train/${opening.id}?mode=learn">Learn</a>
           <a class="btn small" href="#/train/${opening.id}?mode=practice">Practice</a>

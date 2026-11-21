@@ -21,7 +21,7 @@ const STEPS = [
   { route: '#/', title: 'Welcome to Opening Trainer 👋',
     text: 'This short tour opens every part of the site and shows you what it does. Use <b>Next</b> and <b>Back</b>, or the arrow keys. Press <b>Esc</b> to stop.' },
   { route: '#/', target: '.level-box', title: 'Pick your level',
-    text: 'Type in your rating or choose a level (Beginner, Intermediate, Advanced, Expert). The list below then shows the openings that suit you.' },
+    text: 'Choose your level: Beginner, Amateur, Intermediate or Advanced. It sets how deep every line goes, from the first 6 moves up to the full master lines, and which sidelines you learn.' },
   { route: '#/', target: '.filters', title: 'White or Black',
     text: 'Show only the openings you play as White, as Black, or all of them.' },
   { route: '#/', target: '.opening-card', title: 'An opening card',

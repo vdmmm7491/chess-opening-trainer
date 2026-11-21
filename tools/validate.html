@@ -21,7 +21,8 @@
   <div id="out">Checking…</div>
   <script type="module">
     import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
-    import { OPENINGS, LEVELS } from '../js/openings.js';
+    import { OPENINGS, LEVELS, LEVEL_KEYS, linesFor, cutMoves } from '../js/openings.js';
+    import { DEEP_NOTES } from '../js/line-notes-deep.js';
     import { NOTES } from '../js/notes.js';
     import { LINE_NOTES } from '../js/line-notes.js';
     import { LINE_NOTES_BLACK } from '../js/line-notes-black.js';
@@ -58,7 +59,13 @@
         }
         const endsOnUser = (moves.length % 2 === 1) === (o.side === 'w');
         if (!endsOnUser) warnings.push(`${lw}: ends on the opponent's move. Add your reply at the end.`);
+        if (line.from && !LEVELS[line.from]) errors.push(`${lw}: unknown <code>from</code> level <code>${line.from}</code>`);
+        for (const lv of LEVEL_KEYS) {
+          const cut = cutMoves(o, line, lv);
+          if ((cut.length % 2 === 1) !== (o.side === 'w')) errors.push(`${lw}: at ${LEVELS[lv].name} level the cut line ends on the opponent's move`);
+        }
       });
+      for (const lv of LEVEL_KEYS) if (!linesFor(o, lv).length) errors.push(`${where}: no lines at ${LEVELS[lv].name} level`);
     }
     // Coach notes: keys must be legal move sequences, ideally reached by some line.
     const allLines = OPENINGS.flatMap((o) => o.lines.map((l) => l.moves.trim().split(/\s+/).join(' ')));
@@ -86,6 +93,22 @@
           if (mv[i] !== san) errors.push(`<b>${o.name}</b> line ${li + 1}, note ${i + 1}: says <code>${san}</code> but the move is <code>${mv[i]}</code>`);
         });
       });
+    }
+    // Deep notes: [startPly, 'SAN|note', ...] must line up with the line's moves.
+    for (const [id, byLine] of Object.entries(DEEP_NOTES)) {
+      const o = OPENINGS.find((x) => x.id === id);
+      if (!o) { errors.push(`Deep notes for unknown opening <code>${id}</code>`); continue; }
+      for (const [li, arr] of Object.entries(byLine)) {
+        const line = o.lines[li];
+        if (!line) { errors.push(`<b>${o.name}</b>: deep notes for line ${+li + 1}, which doesn't exist`); continue; }
+        const mv = line.moves.trim().split(/\s+/);
+        const [start, ...entries] = arr;
+        if (start + entries.length > mv.length) errors.push(`<b>${o.name}</b> line ${+li + 1}: deep notes run past the end of the line`);
+        entries.forEach((e, i) => {
+          const san = e.split('|')[0];
+          if (mv[start + i] !== san) errors.push(`<b>${o.name}</b> line ${+li + 1}, deep note ${i + 1}: says <code>${san}</code> but move ${start + i + 1} is <code>${mv[start + i]}</code>`);
+        });
+      }
     }
     let missingNotes = 0;
     for (const o of OPENINGS) o.lines.forEach((l, li) => {

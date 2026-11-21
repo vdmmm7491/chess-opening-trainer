@@ -1,6 +1,8 @@
 // Progress tracking stored in localStorage (per device).
 // Use Export / Import on the Profile page to move progress between devices.
 
+import { LEVELS, linesFor } from './openings.js';
+
 const KEY = 'opening-trainer.v1';
 const DAY = 86400000;
 // Spaced-repetition intervals (days) for boxes 0..5
@@ -32,12 +34,28 @@ export function today(d = new Date()) {
 export function getSettings() { return state.settings; }
 export function setSetting(k, v) { state.settings[k] = v; save(); }
 
-export function lineStats(openingId, lineIdx) {
-  return state.lines[`${openingId}:${lineIdx}`] || null;
+// ---- Training level (Beginner / Amateur / Intermediate / Advanced) ----
+// Progress is kept per level: a line learned to move 6 is not the same as the full line.
+// Advanced uses the plain `openingId:lineIndex` key, so progress saved before levels existed
+// (when lines were trained in full) stays with the full lines.
+
+/** Your training level. Unset: Advanced if you already have progress (old full lines), else Beginner. */
+export function getLevel() {
+  const l = state.settings.level;
+  if (LEVELS[l]) return l;
+  return Object.keys(state.lines).length ? 'advanced' : 'beginner';
+}
+export function setLevel(l) { if (LEVELS[l]) setSetting('level', l); }
+
+const keyOf = (openingId, lineIdx, level) =>
+  level === 'advanced' ? `${openingId}:${lineIdx}` : `${openingId}:${lineIdx}@${level}`;
+
+export function lineStats(openingId, lineIdx, level = getLevel()) {
+  return state.lines[keyOf(openingId, lineIdx, level)] || null;
 }
 
-export function recordLine(openingId, lineIdx, mistakes) {
-  const key = `${openingId}:${lineIdx}`;
+export function recordLine(openingId, lineIdx, mistakes, level = getLevel()) {
+  const key = keyOf(openingId, lineIdx, level);
   const s = state.lines[key] || { attempts: 0, perfect: 0, mistakes: 0, box: 0, due: 0, last: 0 };
   s.attempts++;
   s.mistakes += mistakes;
@@ -48,7 +66,7 @@ export function recordLine(openingId, lineIdx, mistakes) {
   state.lines[key] = s;
   const d = today();
   state.days[d] = (state.days[d] || 0) + 1;
-  state.history.unshift({ t: Date.now(), id: openingId, line: lineIdx, mistakes });
+  state.history.unshift({ t: Date.now(), id: openingId, line: lineIdx, level, mistakes });
   state.history = state.history.slice(0, 300);
   save();
   return s;
@@ -59,33 +77,36 @@ export function recordLine(openingId, lineIdx, mistakes) {
 const PLAYED_CREDIT = 0.2;
 
 /** 0..1 progress of one line: 0 unseen, 0.2 once completed, 1 at level 5. */
-export function lineProgress(openingId, lineIdx) {
-  const s = lineStats(openingId, lineIdx);
+export function lineProgress(openingId, lineIdx, level = getLevel()) {
+  const s = lineStats(openingId, lineIdx, level);
   if (!s || !s.attempts) return 0;
   return PLAYED_CREDIT + (1 - PLAYED_CREDIT) * (s.box / 5);
 }
 
-/** Progress summary for an opening: lines played, lines learned (level 3+) and overall 0..1. */
-export function openingProgress(opening) {
-  const total = opening.lines.length;
+/** The line indexes you train in this opening at your level. */
+const idxs = (opening, level) => linesFor(opening, level).map((x) => x.idx);
+
+/** Progress summary for an opening at your level: lines played, learned (strength 3+) and overall 0..1. */
+export function openingProgress(opening, level = getLevel()) {
+  const list = idxs(opening, level);
   let played = 0, learned = 0, sum = 0;
-  opening.lines.forEach((_, i) => {
-    const s = lineStats(opening.id, i);
+  for (const i of list) {
+    const s = lineStats(opening.id, i, level);
     if (s?.attempts) played++;
     if (s?.box >= 3) learned++;
-    sum += lineProgress(opening.id, i);
-  });
-  return { total, played, learned, value: total ? sum / total : 0 };
+    sum += lineProgress(opening.id, i, level);
+  }
+  return { total: list.length, played, learned, value: list.length ? sum / list.length : 0 };
 }
 
 /** 0..1 mastery for an opening (same number the progress bars show). */
 export function mastery(opening) { return openingProgress(opening).value; }
 
-/** Pick the next line to train: unseen or due first, weakest first. */
-export function pickLine(opening, exclude = -1) {
+/** Pick the next line to train at your level: unseen or due first, weakest first. */
+export function pickLine(opening, exclude = -1, level = getLevel()) {
   const now = Date.now();
-  const scored = opening.lines.map((_, i) => {
-    const s = lineStats(opening.id, i);
+  const scored = idxs(opening, level).map((i) => {
+    const s = lineStats(opening.id, i, level);
     let score;
     if (!s) score = -1000 + i; // unseen lines first, in order
     else if (s.due <= now) score = s.box * 10 + (s.due - now) / DAY;
@@ -93,12 +114,12 @@ export function pickLine(opening, exclude = -1) {
     return { i, score: score + (i === exclude ? 500 : 0) };
   });
   scored.sort((a, b) => a.score - b.score);
-  return scored[0].i;
+  return scored[0]?.i ?? 0;
 }
 
-export function dueCount(opening) {
+export function dueCount(opening, level = getLevel()) {
   const now = Date.now();
-  return opening.lines.filter((_, i) => { const s = lineStats(opening.id, i); return !s || s.due <= now; }).length;
+  return idxs(opening, level).filter((i) => { const s = lineStats(opening.id, i, level); return !s || s.due <= now; }).length;
 }
 
 export function summary() {
@@ -121,12 +142,14 @@ export function streak() {
   return n;
 }
 
-/** Lines of this opening completed at least once in Practice mode. */
-export function linesLearned(opening) {
-  return opening.lines.filter((_, i) => (lineStats(opening.id, i)?.attempts || 0) > 0).length;
+/** Lines of this opening completed at least once in Practice mode, at your level. */
+export function linesLearned(opening, level = getLevel()) {
+  return idxs(opening, level).filter((i) => (lineStats(opening.id, i, level)?.attempts || 0) > 0).length;
 }
 export const QUIZ_UNLOCK = 2;
-export function quizUnlocked(opening) { return linesLearned(opening) >= Math.min(QUIZ_UNLOCK, opening.lines.length); }
+export function quizUnlocked(opening, level = getLevel()) {
+  return linesLearned(opening, level) >= Math.min(QUIZ_UNLOCK, idxs(opening, level).length);
+}
 
 /** Save a finished quiz round. Best is compared by percentage. */
 export function recordQuiz(openingId, score, total) {

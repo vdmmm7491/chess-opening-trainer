@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Masters audit</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; padding: 16px; background: #302e2b; color: #fff; }
+    pre { white-space: pre-wrap; font-size: 12px; background: #262421; padding: 10px; border-radius: 6px; }
+    .warn { color: #f7c045; }
+  </style>
+</head>
+<body>
+  <h1>Lines vs. the Lichess Masters database</h1>
+  <p>Checks every move of every line in <code>js/openings.js</code> against the
+    <a href="https://lichess.org/analysis#explorer" style="color:#8fc45a">Lichess Masters database</a>
+    (over-the-board games, 2200+), and shows how each line continues along the most-played master moves.
+    Answers are cached in this browser, so the page can be reloaded and it resumes. It is slow on purpose (Lichess rate limits).</p>
+  <p id="status">Starting…</p>
+  <h2>Moves masters rarely play (your side only)</h2>
+  <pre id="weak"></pre>
+  <h2>Main-line continuation (most-played master moves)</h2>
+  <pre id="ext"></pre>
+  <script type="module">
+    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
+    import { OPENINGS } from '../js/openings.js';
+
+    const MAXPLY = 40;   // extend up to move 20
+    const MINN = 20;     // stop when the main move has fewer master games
+    const CKEY = 'masters-audit-cache.v1';
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(CKEY)) || {}; } catch { /* empty */ }
+    const saveCache = () => { try { localStorage.setItem(CKEY, JSON.stringify(cache)); } catch { /* full */ } };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const statusEl = document.getElementById('status');
+
+    async function q(ucis) {
+      const k = ucis.join(',');
+      if (cache[k]) return cache[k];
+      for (let t = 0; t < 8; t++) {
+        let r;
+        try { r = await fetch(`https://explorer.lichess.ovh/masters?play=${k}&moves=6&topGames=0`); } catch { await sleep(5000); continue; }
+        if (r.status === 429) { statusEl.textContent += ' (rate limited, waiting a minute)'; await sleep(61000); continue; }
+        if (!r.ok) { await sleep(3000); continue; }
+        const j = await r.json();
+        const d = { t: j.white + j.draws + j.black, m: j.moves.map((m) => [m.san, m.uci, m.white + m.draws + m.black]) };
+        cache[k] = d; saveCache();
+        await sleep(400);
+        return d;
+      }
+      throw new Error('Lichess did not answer for ' + k);
+    }
+
+    const results = [];
+    const all = OPENINGS.flatMap((o) => o.lines.map((line, idx) => ({ o, line, idx })));
+    let n = 0;
+    for (const { o, line, idx } of all) {
+      statusEl.textContent = `Line ${++n}/${all.length}: ${o.name} – ${line.name} · ${Object.keys(cache).length} positions cached`;
+      const sans = line.moves.trim().split(/\s+/);
+      const c = new Chess(); const ucis = []; const weak = [];
+      const mine = (ply) => (ply % 2 === 0) === (o.side === 'w');
+      for (let i = 0; i < sans.length; i++) {
+        const pos = await q(ucis);
+        const hit = pos.m.find((x) => x[0] === sans[i]);
+        if (mine(i) && pos.t >= 50 && (!hit || hit[2] < pos.t * 0.05)) {
+          weak.push(`${Math.floor(i / 2) + 1}${i % 2 ? '...' : '.'}${sans[i]} (${hit ? hit[2] : 0} of ${pos.t}; masters play ${pos.m.slice(0, 3).map((x) => `${x[0]} ${x[2]}`).join(', ')})`);
+        }
+        const m = c.move(sans[i]); ucis.push(m.from + m.to + (m.promotion || ''));
+      }
+      const seen = new Set([c.fen().split(' ').slice(0, 4).join(' ')]);
+      const ext = [];
+      if (!line.keep) {
+        while (ucis.length < MAXPLY) {
+          const pos = await q(ucis);
+          const top = pos.m[0];
+          if (!top || top[2] < MINN) break;
+          const m = c.move(top[0]);
+          const f = c.fen().split(' ').slice(0, 4).join(' ');
+          if (seen.has(f)) break; // repetition: no main line to learn
+          seen.add(f);
+          ucis.push(m.from + m.to + (m.promotion || ''));
+          ext.push([top[0], top[2]]);
+        }
+        while (ext.length && !mine(sans.length + ext.length - 1)) ext.pop();
+      }
+      results.push({ id: o.id, idx, name: line.name, len: sans.length, weak, ext });
+    }
+    window.AUDIT = results;
+    statusEl.textContent = `Done: ${results.length} lines, ${Object.keys(cache).length} positions.`;
+    document.getElementById('weak').textContent = results.filter((r) => r.weak.length)
+      .map((r) => `${r.id}#${r.idx} ${r.name}: ${r.weak.join('; ')}`).join('\n') || 'None.';
+    document.getElementById('ext').textContent = results.filter((r) => r.ext.length)
+      .map((r) => `${r.id}#${r.idx} ${r.name} (+${r.ext.length}): ${r.ext.map((e) => `${e[0]}[${e[1]}]`).join(' ')}`).join('\n');
+  </script>
+</body>
+</html>

@@ -1,22 +1,59 @@
 // Opening repertoire data.
 // side:      the colour YOU play when training this opening ('w' or 'b').
-// levels:    which rating bands the opening suits – any of the LEVELS keys below.
+// levels:    which LEVELS the opening suits (shown as badges on the card).
 // levelNote: one sentence on why it suits those players (shown on the card).
-// Each line is a space-separated list of SAN moves starting from the initial position.
+// Each line is a space-separated list of SAN moves starting from the initial position: the
+// FULL main line, which is what Advanced players learn. Lower levels get the same line cut
+// after fewer moves (see LEVELS.upTo). Optional line fields:
+//   from: 'amateur'  – only shown from this level up (sharp or rare sidelines)
+//   keep: true       – never cut (trap lines and short refutations whose point is the last move)
+// Main lines follow the most-played moves in the Lichess Masters database (OTB games, 2200+).
 // To add an opening, append an object here – ids must be unique and never change
 // (progress is stored by id + line index). Check your edits with tools/validate.html.
 
-/** Rating bands, in order. `max` is exclusive. */
+/**
+ * Training levels, in order. `upTo` = the last move number of YOUR moves a line goes to
+ * at that level (Advanced plays the whole line).
+ */
 export const LEVELS = {
-  beginner: { name: 'Beginner', range: 'Under 1000', min: 0, max: 1000, color: '#34b37e' },
-  intermediate: { name: 'Intermediate', range: '1000–1600', min: 1000, max: 1600, color: '#3b82f6' },
-  advanced: { name: 'Advanced', range: '1600–2000', min: 1600, max: 2000, color: '#f08c00' },
-  expert: { name: 'Expert', range: '2000+', min: 2000, max: Infinity, color: '#ef5350' },
+  beginner: { name: 'Beginner', range: 'Under 1000', upTo: 6, blurb: 'The first 6 moves of each main line: the key ideas, nothing to cram.', color: '#34b37e' },
+  amateur: { name: 'Amateur', range: '1000–1500', upTo: 10, blurb: 'Up to move 10, plus the common sidelines.', color: '#3b82f6' },
+  intermediate: { name: 'Intermediate', range: '1500–2000', upTo: 14, blurb: 'Up to move 14, deep enough to reach the middlegame plans.', color: '#f08c00' },
+  advanced: { name: 'Advanced', range: '2000+', upTo: Infinity, blurb: 'The full main lines, as deep as master games go (up to move 20+).', color: '#ef5350' },
 };
+export const LEVEL_KEYS = Object.keys(LEVELS);
 
-/** The level key for a rating number, e.g. 850 -> 'beginner'. */
+/**
+ * Rough level for a Chess.com rating, used only to tailor suggestions from your own games.
+ * The app itself never asks for a rating.
+ */
 export function levelForRating(rating) {
-  return Object.keys(LEVELS).find((k) => rating >= LEVELS[k].min && rating < LEVELS[k].max) || 'beginner';
+  return rating < 1000 ? 'beginner' : rating < 1500 ? 'amateur' : rating < 2000 ? 'intermediate' : 'advanced';
+}
+
+/** The moves of a line at a level: cut so it ends on your move number LEVELS[level].upTo. */
+export function cutMoves(opening, line, level) {
+  const mv = lineMoves(line);
+  const upTo = LEVELS[level]?.upTo ?? Infinity;
+  if (line.keep || upTo === Infinity) return mv;
+  const plies = opening.side === 'w' ? 2 * upTo - 1 : 2 * upTo;
+  return mv.slice(0, plies);
+}
+
+/**
+ * The lines you train at a level: [{ idx, line, name, moves }], in data order. Lines marked
+ * `from` a higher level are left out, and so is a line whose cut moves are the same as (or
+ * part of) another line's, since training that one covers it. `idx` is the index into
+ * opening.lines (progress is stored by it).
+ */
+export function linesFor(opening, level) {
+  const li = LEVEL_KEYS.indexOf(level);
+  const all = opening.lines
+    .map((line, idx) => ({ idx, line, name: line.name, moves: cutMoves(opening, line, level) }))
+    .filter((x) => !x.line.from || LEVEL_KEYS.indexOf(x.line.from) <= li);
+  const str = all.map((x) => x.moves.join(' '));
+  return all.filter((x, i) => !str.some((s, j) => j !== i && (
+    (s === str[i] && j < i) || s.startsWith(str[i] + ' '))));
 }
 
 export const OPENINGS = [
@@ -24,7 +61,7 @@ export const OPENINGS = [
   {
     id: 'italian', name: 'Italian Game', eco: 'C50–C54', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Italian_Game',
-    levels: ['beginner', 'intermediate', 'advanced'],
+    levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Teaches the basics (fast development, castling, centre control) and stays playable all the way up.',
     description: 'Develop fast, aim the bishop at f7 and build a slow, solid centre with c3 and d3/d4.',
     lines: [
@@ -40,16 +77,16 @@ export const OPENINGS = [
   {
     id: 'ruy-lopez', name: 'Ruy López', eco: 'C60–C99', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Ruy_Lopez',
-    levels: ['intermediate', 'advanced', 'expert'],
+    levels: ['amateur', 'intermediate', 'advanced'],
     levelNote: 'Deep theory and slow manoeuvring plans pay off once you understand pawn structures.',
     description: 'The Spanish: pressure the e5 defender with Bb5 and play for a long-term central advantage.',
     lines: [
       { name: 'Closed Morphy', moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3' },
       { name: 'Berlin Defence', moves: 'e4 e5 Nf3 Nc6 Bb5 Nf6 O-O Nxe4 d4 Nd6 Bxc6 dxc6 dxe5 Nf5 Qxd8+ Kxd8 Nc3' },
       { name: 'Exchange Variation', moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O f6 d4 exd4 Nxd4 c5 Nb3 Qxd1 Rxd1' },
-      { name: 'Marshall Attack', moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 O-O c3 d5 exd5 Nxd5 Nxe5 Nxe5 Rxe5 c6 d4' },
+      { name: 'Marshall Attack', moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 O-O c3 d5 exd5 Nxd5 Nxe5 Nxe5 Rxe5 c6 d4', from: 'intermediate' },
       { name: 'Open Ruy López', moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Nxe4 d4 b5 Bb3 d5 dxe5 Be6 c3' },
-      { name: 'Schliemann Gambit', moves: 'e4 e5 Nf3 Nc6 Bb5 f5 Nc3 fxe4 Nxe4 d5 Nxe5 dxe4 Nxc6 Qg5 Qe2 Nf6 f4' },
+      { name: 'Schliemann Gambit', moves: 'e4 e5 Nf3 Nc6 Bb5 f5 Nc3 fxe4 Nxe4 d5 Nxe5 dxe4 Nxc6 Qg5 Qe2 Nf6 f4', from: 'amateur' },
       { name: 'Steinitz Defence', moves: 'e4 e5 Nf3 Nc6 Bb5 d6 d4 Bd7 Nc3 Nf6 O-O Be7 Re1' },
       { name: 'Classical 3...Bc5', moves: 'e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 O-O O-O d4 Bb6 Re1' },
     ],
@@ -57,7 +94,7 @@ export const OPENINGS = [
   {
     id: 'scotch', name: 'Scotch Game', eco: 'C44–C45', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Scotch_Game',
-    levels: ['beginner', 'intermediate', 'advanced'],
+    levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Open, direct positions with clear plans and little theory to memorise.',
     description: 'Open the centre immediately with d4 for active, direct piece play.',
     lines: [
@@ -71,7 +108,7 @@ export const OPENINGS = [
   {
     id: 'queens-gambit', name: "Queen's Gambit", eco: 'D06–D69', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Queen%27s_Gambit',
-    levels: ['intermediate', 'advanced', 'expert'],
+    levels: ['amateur', 'intermediate', 'advanced'],
     levelNote: 'Positional and principled. Best once you are comfortable with slower, strategic games.',
     description: 'Offer the c-pawn to deflect Black from the centre. Positional, principled, timeless.',
     lines: [
@@ -81,14 +118,14 @@ export const OPENINGS = [
       { name: 'QGD Exchange', moves: 'd4 d5 c4 e6 Nc3 Nf6 cxd5 exd5 Bg5 Be7 e3 O-O Bd3 Nbd7 Qc2' },
       { name: 'Semi-Slav', moves: 'd4 d5 c4 c6 Nf3 Nf6 Nc3 e6 e3 Nbd7 Qc2 Bd6 Bd3' },
       { name: 'Tarrasch Defence', moves: 'd4 d5 c4 e6 Nc3 c5 cxd5 exd5 Nf3 Nc6 g3 Nf6 Bg2 Be7 O-O' },
-      { name: 'Albin Countergambit', moves: 'd4 d5 c4 e5 dxe5 d4 Nf3 Nc6 g3 Be6 Nbd2 Qd7 Bg2' },
-      { name: 'Chigorin Defence', moves: 'd4 d5 c4 Nc6 Nc3 dxc4 Nf3 Nf6 e4 Bg4 Be3 e6 Bxc4' },
+      { name: 'Albin Countergambit', moves: 'd4 d5 c4 e5 dxe5 d4 Nf3 Nc6 g3 Be6 Nbd2 Qd7 Bg2', from: 'amateur' },
+      { name: 'Chigorin Defence', moves: 'd4 d5 c4 Nc6 Nc3 dxc4 Nf3 Nf6 e4 Bg4 Be3 e6 Bxc4', from: 'amateur' },
     ],
   },
   {
     id: 'london', name: 'London System', eco: 'D02 / A48', side: 'w',
     source: 'https://en.wikipedia.org/wiki/London_System',
-    levels: ['beginner', 'intermediate'],
+    levels: ['beginner', 'amateur'],
     levelNote: 'The same setup against almost everything, so there is very little to memorise.',
     description: 'A reliable setup: d4, Bf4, e3, Nf3, c3 and Bd3 against almost anything.',
     lines: [
@@ -104,7 +141,7 @@ export const OPENINGS = [
   {
     id: 'english', name: 'English Opening', eco: 'A10–A39', side: 'w',
     source: 'https://en.wikipedia.org/wiki/English_Opening',
-    levels: ['advanced', 'expert'],
+    levels: ['intermediate', 'advanced'],
     levelNote: 'Flexible and transpositional. You need a feel for structures more than memorised lines.',
     description: 'Flexible flank opening – control d5 with c4, fianchetto and play a reversed Sicilian.',
     lines: [
@@ -120,7 +157,7 @@ export const OPENINGS = [
   {
     id: 'vienna', name: 'Vienna Game', eco: 'C25–C29', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Vienna_Game',
-    levels: ['beginner', 'intermediate'],
+    levels: ['beginner', 'amateur'],
     levelNote: 'Aggressive, full of traps, and opponents at club level often go wrong early.',
     description: 'Nc3 first, then an early f4 – an aggressive weapon against 1...e5.',
     lines: [
@@ -136,14 +173,14 @@ export const OPENINGS = [
   {
     id: 'alien-gambit', name: 'Alien Gambit', eco: 'B15', side: 'w',
     source: 'https://ramachess.com/articles/alien-gambit/',
-    levels: ['beginner', 'intermediate'],
+    levels: ['beginner', 'amateur'],
     levelNote: 'Full of traps and great in fast games below club level. Objectively unsound: Stockfish gives Black about −1.8 with correct defence.',
     description: 'Witty Alien\'s 2023 gambit against the Caro-Kann: after 4...Nf6, play 5.Ng5 and sacrifice the knight on f7 to drag Black\'s king out.',
     lines: [
       { name: 'Main line – 7.Nf3 c5 8.Bc4+', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ e6 Qe2 cxd4 Bd2 Nc6 O-O-O' },
-      { name: 'Trap – the king walks forward', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ Kg6 Ne5+ Kh7 Qd3+ g6 Qxg6#' },
-      { name: 'Trap – 7...Bg4?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Bg4 Ne5+ Ke8 Nxg4' },
-      { name: 'Trap – 7...Qd5?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Qd5 Bc4 Qxc4 Ne5+ Kg8 Nxc4' },
+      { name: 'Trap – the king walks forward', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 c5 Bc4+ Kg6 Ne5+ Kh7 Qd3+ g6 Qxg6#', keep: true },
+      { name: 'Trap – 7...Bg4?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Bg4 Ne5+ Ke8 Nxg4', keep: true },
+      { name: 'Trap – 7...Qd5?', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Nf3 Qd5 Bc4 Qxc4 Ne5+ Kg8 Nxc4', keep: true },
       { name: '7.Bc4+ Be6 (best defence)', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 h6 Nxf7 Kxf7 Bc4+ Be6 Bxe6+ Kxe6 c4 Kf7 Nf3 e6 O-O' },
       { name: 'vs 5...Bf5', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 Bf5 Bd3 Bxd3 Qxd3 h6 N5f3 e6 Ne5 Be7 c3' },
       { name: 'vs 5...c5', moves: 'e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nf6 Ng5 c5 Bc4 e6 Ne2 a6 a4 Nc6 Nf3 b6 O-O' },
@@ -154,7 +191,7 @@ export const OPENINGS = [
   {
     id: 'sicilian-najdorf', name: 'Sicilian Najdorf', eco: 'B90–B99', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Sicilian_Defence,_Najdorf_Variation',
-    levels: ['advanced', 'expert'],
+    levels: ['intermediate', 'advanced'],
     levelNote: 'Very sharp with huge amounts of theory. One wrong move can lose on the spot.',
     description: 'The sharpest answer to 1.e4. ...a6 keeps options open for ...e5 or ...e6 and queenside play.',
     lines: [
@@ -163,8 +200,8 @@ export const OPENINGS = [
       { name: '6.Be2 Classical', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be2 e5 Nb3 Be7 O-O O-O Be3 Be6' },
       { name: 'vs Alapin 2.c3', moves: 'e4 c5 c3 Nf6 e5 Nd5 d4 cxd4 Nf3 Nc6 cxd4 d6 Bc4 Nb6 Bb5 dxe5' },
       { name: '6.Bc4 Fischer–Sozin', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Bc4 e6 Bb3 b5 O-O Be7 Qf3 Qc7' },
-      { name: '6.f4', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 f4 e5 Nf3 Nbd7' },
-      { name: '6.h3', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 h3 e5 Nde2 h5' },
+      { name: '6.f4', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 f4 e5 Nf3 Nbd7', from: 'amateur' },
+      { name: '6.h3', moves: 'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 h3 e5 Nde2 h5', from: 'intermediate' },
       { name: 'vs 3.Bb5+', moves: 'e4 c5 Nf3 d6 Bb5+ Bd7 Bxd7+ Qxd7 O-O Nc6 c3 Nf6' },
       { name: 'vs Smith-Morra Gambit', moves: 'e4 c5 d4 cxd4 c3 dxc3 Nxc3 Nc6 Nf3 d6 Bc4 e6 O-O Nf6' },
       { name: 'vs Closed Sicilian', moves: 'e4 c5 Nc3 Nc6 g3 g6 Bg2 Bg7 d3 d6' },
@@ -174,7 +211,7 @@ export const OPENINGS = [
   {
     id: 'french', name: 'French Defence', eco: 'C00–C19', side: 'b',
     source: 'https://en.wikipedia.org/wiki/French_Defence',
-    levels: ['intermediate', 'advanced'],
+    levels: ['amateur', 'intermediate'],
     levelNote: 'Solid, with clear pawn-break plans (...c5, ...f6), but the light-squared bishop needs care.',
     description: 'Solid and counter-attacking: ...e6 and ...d5, then strike back with ...c5 and ...f6.',
     lines: [
@@ -192,7 +229,7 @@ export const OPENINGS = [
   {
     id: 'caro-kann', name: 'Caro-Kann Defence', eco: 'B10–B19', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Caro%E2%80%93Kann_Defence',
-    levels: ['beginner', 'intermediate', 'advanced'],
+    levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Safe and sound with few early traps. A reliable defence at every level.',
     description: 'Rock-solid: ...c6 and ...d5 with a healthy pawn structure and the light bishop outside the chain.',
     lines: [
@@ -210,7 +247,7 @@ export const OPENINGS = [
   {
     id: 'scandinavian', name: 'Scandinavian Defence', eco: 'B01', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Scandinavian_Defense',
-    levels: ['beginner', 'intermediate'],
+    levels: ['beginner', 'amateur'],
     levelNote: 'Forces the game onto your terms from move one, with simple development plans.',
     description: 'Challenge e4 immediately with ...d5. Simple plans and easy development.',
     lines: [
@@ -225,7 +262,7 @@ export const OPENINGS = [
   {
     id: 'open-game-black', name: '1...e5 Open Games', eco: 'C40–C59', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Open_Game',
-    levels: ['beginner', 'intermediate', 'advanced'],
+    levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'The classical answer to 1.e4. It teaches open-game principles you will use forever.',
     description: 'Meet 1.e4 with the classical 1...e5 – correct answers to the Italian, Scotch and friends.',
     lines: [
@@ -244,7 +281,7 @@ export const OPENINGS = [
   {
     id: 'kings-indian', name: "King's Indian Defence", eco: 'E60–E99', side: 'b',
     source: 'https://en.wikipedia.org/wiki/King%27s_Indian_Defence',
-    levels: ['advanced', 'expert'],
+    levels: ['intermediate', 'advanced'],
     levelNote: 'You give White the centre on purpose, so you must know exactly when and how to strike back.',
     description: 'Let White take the centre, then hit back with ...e5 and a kingside pawn storm.',
     lines: [
@@ -261,7 +298,7 @@ export const OPENINGS = [
   {
     id: 'nimzo', name: 'Nimzo-Indian Defence', eco: 'E20–E59', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Nimzo-Indian_Defence',
-    levels: ['advanced', 'expert'],
+    levels: ['intermediate', 'advanced'],
     levelNote: 'Subtle positional ideas: bishop pair vs. structure and control of e4.',
     description: 'Pin the c3-knight with ...Bb4 and fight for e4 with pieces rather than pawns.',
     lines: [

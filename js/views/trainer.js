@@ -1,5 +1,5 @@
-import { getOpening, lineMoves } from '../openings.js';
-import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { getOpening, LEVELS, linesFor } from '../openings.js';
+import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -18,6 +18,10 @@ export function render(root, { id, query }) {
   const settings = getSettings();
   if (settings.coach === undefined) setSetting('coach', true);
   const engine = getEngine();
+  let level = getLevel();
+  let lines = linesFor(opening, level); // the lines you train at your level (cut to its depth)
+  const entry = (idx) => lines.find((x) => x.idx === idx);
+  const posOf = (idx) => lines.findIndex((x) => x.idx === idx) + 1;
 
   const view = h(`<div class="play-layout">
     <div><div class="board-wrap"><div class="board"></div></div></div>
@@ -25,6 +29,7 @@ export function render(root, { id, query }) {
       <div class="card">
         <div class="kv" style="align-items:center"><h1 style="margin:0">${esc(opening.name)}</h1>
           <span class="tag ${userColor}">You play ${userColor === 'w' ? 'White' : 'Black'}</span></div>
+        <label class="trainer-level muted">Level <select class="input levelsel" aria-label="Training level">${Object.entries(LEVELS).map(([k, l]) => `<option value="${k}">${esc(l.name)}</option>`).join('')}</select></label>
         <div class="trainer-progress">${progressBar(openingProgress(opening))}</div>
         <div class="btn-row" style="margin:10px 0">
           <button class="btn small" data-mode="learn">Learn</button>
@@ -35,7 +40,7 @@ export function render(root, { id, query }) {
       </div>
       <div class="lines-backdrop"></div>
       <div class="card lines-card" role="dialog" aria-label="Choose a line">
-        <div class="lines-head"><b>📖 Choose a line</b><span class="muted">${opening.lines.length} lines</span>
+        <div class="lines-head"><b>📖 Choose a line</b><span class="muted lines-count"></span>
           <button class="btn small lines-close" aria-label="Close">✕</button></div>
         <div class="line-list"></div>
       </div>
@@ -174,15 +179,16 @@ export function render(root, { id, query }) {
   function start(idx) {
     timers.forEach(clearTimeout); timers.clear();
     coachToken++;
+    if (!entry(idx)) idx = pickLine(opening, -1, level);
     lineIdx = idx;
-    moves = lineMoves(opening.lines[idx]);
+    moves = entry(idx).moves;
     chess = new Chess();
     mistakes = 0; tries = 0; phase = 'book'; busy = false;
     openLines(false);
     renderLineList();
     const st = lineStats(opening.id, idx);
-    lineInfoEl.textContent = `Line ${idx + 1}/${opening.lines.length}: ${opening.lines[idx].name}` +
-      (st ? ` · practised ${st.attempts}× · level ${st.box}/5` : ' · new');
+    lineInfoEl.textContent = `Line ${posOf(idx)}/${lines.length}: ${entry(idx).name} · ${LEVELS[level].name}, ${Math.ceil(moves.length / 2)} moves` +
+      (st ? ` · practised ${st.attempts}× · strength ${st.box}/5` : ' · new');
     coachIntro();
     sync();
     if (userColor === 'b') { busy = true; setStatus('Watch White\'s move…'); later(opponentMove, 500); }
@@ -192,14 +198,15 @@ export function render(root, { id, query }) {
   // ---------------- Line picker ----------------
   function renderLineList() {
     const list = $('.line-list');
-    list.innerHTML = opening.lines.map((l, i) => {
+    $('.lines-count').textContent = `${lines.length} lines · ${LEVELS[level].name}`;
+    list.innerHTML = lines.map(({ idx: i, name }, n) => {
       const st = lineStats(opening.id, i);
       const meta = !st ? '<span class="li-new">New</span>'
-        : `<span class="li-level" title="Level ${st.box}/5">${'●'.repeat(st.box)}${'○'.repeat(5 - st.box)}</span>`;
+        : `<span class="li-level" title="Strength ${st.box}/5">${'●'.repeat(st.box)}${'○'.repeat(5 - st.box)}</span>`;
       return `<button type="button" class="line-item${i === lineIdx ? ' cur' : ''}" data-line="${i}">
-        <span class="li-num">${i + 1}</span><span class="li-name">${esc(l.name)}</span>${meta}</button>`;
+        <span class="li-num">${n + 1}</span><span class="li-name">${esc(name)}</span>${meta}</button>`;
     }).join('');
-    $('.lc-name').innerHTML = `<b>Line ${lineIdx + 1}/${opening.lines.length}</b> ${esc(opening.lines[lineIdx].name)}`;
+    $('.lc-name').innerHTML = `<b>Line ${posOf(lineIdx)}/${lines.length}</b> ${esc(entry(lineIdx).name)}`;
     const cur = list.querySelector('.cur');
     if (cur) list.scrollTop = cur.offsetTop - list.offsetTop - list.clientHeight / 2 + cur.offsetHeight / 2;
   }
@@ -371,10 +378,10 @@ export function render(root, { id, query }) {
       const justUnlocked = wasLocked && quizUnlocked(opening);
       updateProgressBar($('.trainer-progress .pbar'), openingProgress(opening));
       renderLineList();
-      lineInfoEl.textContent = `Line ${lineIdx + 1}/${opening.lines.length}: ${opening.lines[lineIdx].name}` +
-        ` · practised ${s.attempts}× · level ${s.box}/5`;
+      lineInfoEl.textContent = `Line ${posOf(lineIdx)}/${lines.length}: ${entry(lineIdx).name} · ${LEVELS[level].name}, ${Math.ceil(moves.length / 2)} moves` +
+        ` · practised ${s.attempts}× · strength ${s.box}/5`;
       setStatus(mistakes === 0
-        ? `🎉 Line complete with no mistakes! (level ${s.box}/5)`
+        ? `🎉 Line complete with no mistakes! (strength ${s.box}/5)`
         : `Line complete with ${mistakes} mistake${mistakes > 1 ? 's' : ''}. It will come back sooner for review.`,
         mistakes === 0 ? 'good' : '');
       if (justUnlocked) {
@@ -420,7 +427,7 @@ export function render(root, { id, query }) {
         break;
       }
       case 'restart': start(lineIdx); break;
-      case 'next': start((lineIdx + 1) % opening.lines.length); break;
+      case 'next': start(lines[posOf(lineIdx) % lines.length].idx); break;
       case 'playon':
         phase = 'free';
         coachToken++;
@@ -449,8 +456,17 @@ export function render(root, { id, query }) {
   ctoggle.addEventListener('change', () => { setSetting('coach', ctoggle.checked); coachRender(); });
 
   const firstLine = Number(query.line);
-  start(query.line !== undefined && query.line !== '' && firstLine >= 0 && firstLine < opening.lines.length
-    ? firstLine : pickLine(opening));
+  const levelSel = $('.levelsel');
+  levelSel.value = level;
+  levelSel.addEventListener('change', () => {
+    level = levelSel.value;
+    setLevel(level);
+    lines = linesFor(opening, level);
+    updateProgressBar($('.trainer-progress .pbar'), openingProgress(opening));
+    start(entry(lineIdx) ? lineIdx : pickLine(opening));
+  });
+
+  start(query.line !== undefined && query.line !== '' && entry(firstLine) ? firstLine : pickLine(opening));
 
   return () => { alive = false; coachToken++; timers.forEach(clearTimeout); analyser.cancel(); phase = 'gone'; };
 }

@@ -7,6 +7,7 @@ import { LINE_NOTES_BLACK } from './line-notes-black.js';
 import { LINE_NOTES_D4 } from './line-notes-d4.js';
 import { ROUTINE_NOTES } from './notes-routine.js';
 import { ROUTINE_NOTES_BLACK } from './notes-routine-black.js';
+import { DEEP_NOTES } from './line-notes-deep.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 /** All theory notes keyed by the SAN sequence. notes.js wins over per-line notes. */
@@ -25,6 +26,20 @@ export const THEORY = (() => {
         }
       });
     });
+  }
+  // Deep notes: [startPly, 'SAN|note', ...] per line, for the moves past the original lines.
+  for (const [id, byLine] of Object.entries(DEEP_NOTES)) {
+    const o = OPENINGS.find((x) => x.id === id);
+    for (const [li, arr] of Object.entries(byLine)) {
+      const mv = o?.lines[li] ? lineMoves(o.lines[li]) : [];
+      const [start, ...entries] = arr;
+      entries.forEach((e, i) => {
+        const [san, ...rest] = e.split('|');
+        const text = rest.join('|').trim();
+        const key = mv.slice(0, start + i + 1).join(' ');
+        if (text && mv[start + i] === san && !map[key]) map[key] = text;
+      });
+    }
   }
   return { ...map, ...ROUTINE_NOTES, ...ROUTINE_NOTES_BLACK, ...NOTES };
 })();
