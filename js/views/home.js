@@ -9,7 +9,7 @@ let sideFilter = 'all';
 function levelBadges(o) {
   return (o.levels || []).map((k) => {
     const l = LEVELS[k];
-    return l ? `<span class="lvl" style="--lvl:${l.color}" title="Suits ${esc(l.name)} players (${esc(l.range)})">${esc(l.name)}</span>` : '';
+    return l ? `<span class="lvl" style="--lvl:${l.color}" title="Suits ${esc(l.name)} players (${esc(l.range)} Elo)">${esc(l.name)}</span>` : '';
   }).join('');
 }
 
@@ -35,7 +35,7 @@ export function render(root) {
     </div>
     <div class="level-chips">
       ${Object.entries(LEVELS).map(([k, l]) =>
-        `<button class="level-chip" data-level="${k}" style="--lvl:${l.color}"><b>${esc(l.name)}</b><span class="level-range">${esc(l.range)} rating</span><span>${l.upTo === Infinity ? 'Full lines' : `Up to move ${l.upTo}`}</span></button>`).join('')}
+        `<button class="level-chip" data-level="${k}" style="--lvl:${l.color}"><b>${esc(l.name)}</b><span class="level-range">${esc(l.range)} Elo</span><span>${l.upTo === Infinity ? 'Full lines' : `Up to move ${l.upTo}`}</span></button>`).join('')}
     </div>
     <p class="muted level-blurb"></p>
   </div>`);
