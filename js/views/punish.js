@@ -1,7 +1,7 @@
 // Punish mistakes: the board shows a position right after a common opponent mistake
 // in this opening; find the move (or short sequence) that punishes it.
 import { getOpening } from '../openings.js';
-import { PUNISH, BANDS, bandFor } from '../punish.js';
+import { PUNISH, BANDS, bandFor, inBand } from '../punish.js';
 import { recordPunish, punishStats, getSettings, setSetting } from '../progress.js';
 import { Board } from '../board.js';
 import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from '../ui.js';
@@ -75,7 +75,7 @@ export function render(root, { id, query }) {
 
   // ---- Rating band: show the mistakes players at your level actually make ----
   const bandSelect = $('.punish-band');
-  const countIn = (min) => list.filter((e) => e.elo === min).length;
+  const countIn = (min) => list.filter((e) => inBand(e, min)).length;
   const bandsWithEntries = BANDS.filter((b) => countIn(b.min));
   bandSelect.innerHTML = `<option value="all">All ratings (${list.length})</option>` +
     BANDS.map((b) => `<option value="${b.min}"${countIn(b.min) ? '' : ' disabled'}>${b.label} (${countIn(b.min)})</option>`).join('');
@@ -100,7 +100,7 @@ export function render(root, { id, query }) {
     }
     if (remember) setSetting('punishBand', value);
     bandSelect.value = String(band);
-    visible = list.map((_, i) => i).filter((i) => band === 'all' || list[i].elo === band);
+    visible = list.map((_, i) => i).filter((i) => band === 'all' || inBand(list[i], band));
   }
 
   function fillSelect() {

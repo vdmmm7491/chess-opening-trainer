@@ -107,6 +107,7 @@
         const pw = `<b>${o.name}</b> punish ${i + 1} (${e.name})`;
         if (!e.name || !e.moves || !e.punish || !e.mistake || !e.why) errors.push(`${pw}: needs name, moves, punish, mistake and why`);
         if (!BANDS.some((b) => b.min === e.elo)) errors.push(`${pw}: <code>elo</code> must be one of ${BANDS.map((b) => b.min).join(', ')}`);
+        if (e.upTo !== undefined && (!BANDS.some((b) => b.min === e.upTo) || e.upTo < e.elo)) errors.push(`${pw}: <code>upTo</code> must be a band min at or above <code>elo</code>`);
         const c = new Chess();
         for (const s of (e.moves || '').trim().split(/\s+/)) {
           try { c.move(s); } catch { errors.push(`${pw}: illegal move <code>${s}</code> in moves`); return; }
