@@ -14,11 +14,14 @@ const COUNTERS = [
   // ---- you were White: the opponent's defence
   { color: 'w', match: /caro ?kann/, picks: [
     { id: 'alien-gambit', why: 'Sacrifices a knight on f7 on move 5 against the main line. Most Caro-Kann players have never seen it and the traps come fast.' },
+    { id: 'advance-french-caro', why: 'Or the sound way: 3.e5 grabs space and takes the Caro-Kann player out of their comfort zone.' },
     { id: 'london', why: 'Or sidestep it: open with 1.d4 and the Caro-Kann never appears on the board.' }] },
   { color: 'w', match: /sicilian/, picks: [
+    { id: 'alapin-sicilian', why: 'Keep 1.e4 and answer 1...c5 with 2.c3 and d4: a full centre and clear plans, without the huge Open Sicilian theory.' },
     { id: 'london', why: 'Open with 1.d4 and the Sicilian can\'t happen. The London is the same easy setup every game, so there is far less theory to learn.' },
     { id: 'queens-gambit', why: 'Or play 1.d4 2.c4 for a classical fight in the centre, again with no Sicilian.' }] },
   { color: 'w', match: /french/, picks: [
+    { id: 'advance-french-caro', why: 'Keep 1.e4 and play 3.e5: you grab space, cramp Black\'s light-squared bishop and get kingside chances.' },
     { id: 'london', why: 'Open with 1.d4: French players don\'t get their closed, counter-punching structure, and your bishop gets out before ...e6 locks it in.' },
     { id: 'queens-gambit', why: 'Or 1.d4 2.c4, where ...e6 players often land in the Queen\'s Gambit Declined, which you will know better.' }] },
   { color: 'w', match: /scandinavian|center counter|centre counter/, picks: [
@@ -30,7 +33,7 @@ const COUNTERS = [
     { id: 'london', why: 'The London has a ready-made line against the Dutch: develop, castle and hit the weakened e6 square.' }] },
   { color: 'w', match: /kings indian|grunfeld|benoni|queens indian|nimzo|bogo|indian/, picks: [
     { id: 'london', why: 'The London keeps the same setup against ...g6 and ...b6 fianchettos, so you skip their sharp main lines.' }] },
-  { color: 'w', match: /slav|queens gambit|tarrasch|chigorin|albin/, picks: [
+  { color: 'w', match: /slav|queens gambit|tarrasch|chigorin|albin|catalan/, picks: [
     { id: 'queens-gambit', why: 'Covers the Slav, Semi-Slav, Accepted, Tarrasch, Albin and Chigorin replies to 1.d4 d5 2.c4.' },
     { id: 'london', why: 'Or keep it simple with 2.Bf4 and the same setup every game.' }] },
   { color: 'w', match: /petrov|russian|philidor|latvian|elephant|damiano/, picks: [
@@ -42,13 +45,20 @@ const COUNTERS = [
     { id: 'caro-kann', why: 'Or avoid 1...e5 entirely: the Caro-Kann is solid and needs far less memorising.' }] },
   { color: 'b', match: /london|jobava|colle|zukertort|trompowsky|torre|queens pawn opening/, picks: [
     { id: 'kings-indian', why: 'Has lines against the London and the Trompowsky: fianchetto, castle and strike back with ...c5 or ...e5.' },
+    { id: 'qgd', why: 'Or the classical answer: ...d5, ...e6 and ...c5 against the London and the Colle, with ready-made lines for both.' },
     { id: 'nimzo', why: 'Or play ...e6 and ...b6 setups that take the sting out of system openings.' }] },
   { color: 'b', match: /queens gambit|catalan|slav/, picks: [
+    { id: 'qgd', why: 'The classical answer to the Queen\'s Gambit: hold d5 with ...e6, develop and castle. Covers the Exchange, 5.Bf4 and the Catalan too.' },
+    { id: 'slav', why: 'Or the Slav: just as solid, and your light-squared bishop gets out before ...e6.' },
     { id: 'nimzo', why: 'Meet 1.d4 with 1...Nf6 and 2...e6: you get the Nimzo-Indian instead of defending the Queen\'s Gambit.' },
     { id: 'kings-indian', why: 'Or the King\'s Indian, a fighting answer that also skips the Queen\'s Gambit.' }] },
+  { color: 'b', match: /dutch/, picks: [
+    { id: 'dutch-stonewall', why: 'Covers the main fianchetto lines plus 2.Nc3, the Staunton Gambit and the London.' }] },
   { color: 'b', match: /english|reti|bird|larsen|nimzo larsen/, picks: [
     { id: 'kings-indian', why: 'The King\'s Indian setup works against almost every flank opening.' }] },
   { color: 'b', match: /sicilian/, picks: [
+    { id: 'sicilian-classical', why: 'A real Open Sicilian with natural development and much less theory than the Najdorf. Covers the Rossolimo and the Alapin.' },
+    { id: 'accelerated-dragon', why: 'Or the Accelerated Dragon: one fixed set-up (...g6, ...Bg7) and no Yugoslav Attack to fear.' },
     { id: 'sicilian-najdorf', why: 'Covers the Open Sicilian plus the Alapin, Smith-Morra, Closed, Grand Prix and 3.Bb5+.' },
     { id: 'caro-kann', why: 'Or switch to the Caro-Kann: much less theory and a very solid position.' }] },
   { color: 'b', match: /french/, picks: [

@@ -27,6 +27,7 @@
     import { LINE_NOTES } from '../js/line-notes.js';
     import { LINE_NOTES_BLACK } from '../js/line-notes-black.js';
     import { LINE_NOTES_D4 } from '../js/line-notes-d4.js';
+    import { LINE_NOTES_NEXT } from '../js/line-notes-next.js';
     import { ROUTINE_NOTES } from '../js/notes-routine.js';
     import { ROUTINE_NOTES_BLACK } from '../js/notes-routine-black.js';
     import { THEORY } from '../js/coach.js';
@@ -80,7 +81,7 @@
     }
 
     // Per-line theory notes: each entry's move must match the line, and every position needs a note.
-    const ALL_LINE_NOTES = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK };
+    const ALL_LINE_NOTES = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK, ...LINE_NOTES_NEXT };
     for (const [id, lines] of Object.entries(ALL_LINE_NOTES)) {
       const o = OPENINGS.find((x) => x.id === id);
       if (!o) { errors.push(`Line notes for unknown opening <code>${id}</code>`); continue; }

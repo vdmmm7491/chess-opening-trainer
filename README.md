@@ -24,7 +24,7 @@ Pick an opening, play your side of the board, and the trainer tells you right aw
 
 | As White | As Black |
 | --- | --- |
-| Italian Game · Ruy López · Scotch Game · Queen's Gambit · London System · English Opening · Vienna Game · Alien Gambit | Sicilian Najdorf · French Defence · Caro-Kann Defence · Scandinavian Defence · 1…e5 Open Games · King's Indian Defence · Nimzo-Indian Defence |
+| Italian Game · Ruy López · Scotch Game · Queen's Gambit · London System · English Opening · Vienna Game · Alien Gambit · Alapin Sicilian · Advance vs French & Caro-Kann · Catalan Opening | Sicilian Najdorf · French Defence · Caro-Kann Defence · Scandinavian Defence · 1…e5 Open Games · King's Indian Defence · Nimzo-Indian Defence · Classical Sicilian · Accelerated Dragon · Sicilian Dragon · Slav Defence · Queen's Gambit Declined · Stonewall Dutch |
 
 Not sure where to start? Type in your rating and the site shows you the openings that suit your level, with a short note on why.
 
