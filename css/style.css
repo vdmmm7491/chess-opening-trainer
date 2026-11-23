@@ -154,6 +154,9 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .tier-box { --tier: var(--accent); margin-bottom: 14px; border-top: 4px solid var(--tier); transition: border-color 0.35s; }
 .tier-head { margin-bottom: 12px; }
 /* Custom track + thumb (animated); the real range input sits invisibly on top for drag, click and keys */
+/* Half the card's width on desktop so the thumb is a short mouse trip; full width on phones */
+.tier-control { max-width: 50%; }
+@media (max-width: 760px) { .tier-control { max-width: none; } }
 .tier-track { --p: 0; --thumb: 24px; position: relative; height: 32px; margin: 2px 0 4px; }
 .tier-track::before, .tier-fill {
   content: ''; position: absolute; left: 0; top: 50%; height: 10px; margin-top: -5px; border-radius: 999px;
