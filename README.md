@@ -20,7 +20,7 @@ Free, open source, runs in your browser. No account, no install, no ads.
 
 Pick an opening, play your side of the board, and the trainer tells you right away whether you found the book move. Lines you keep getting wrong come back sooner, and the ones you know well step aside. A few minutes a day is enough to make an opening stick.
 
-**14 openings · 109 lines · a written explanation for every single move.**
+**15 openings · 116 lines · a written explanation for every single move.**
 
 | As White | As Black |
 | --- | --- |
