@@ -38,7 +38,7 @@ export function render(root, { id, query }) {
       <div class="card status-card">
         <div class="quiz-head"><b>⚔️ ${esc(opening.name)}</b><span class="tag ${userColor}">${userColor === 'w' ? 'White' : 'Black'}</span></div>
         <div class="punish-pickers">
-          <select class="input punish-level" aria-label="Training level">${LEVEL_KEYS.map((k) => `<option value="${k}">${esc(LEVELS[k].name)} (${esc(LEVELS[k].range)})</option>`).join('')}</select>
+          <select class="input punish-level" aria-label="Training level">${LEVEL_KEYS.map((k) => `<option value="${k}" title="${esc(LEVELS[k].range)}">${esc(LEVELS[k].name)}</option>`).join('')}</select>
           <select class="input punish-line" aria-label="Line"></select>
           <select class="input punish-select" aria-label="Position"></select>
         </div>
