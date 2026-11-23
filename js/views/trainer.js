@@ -408,7 +408,7 @@ export function render(root, { id, query }) {
     doneDlg.querySelector('.ld-extra').innerHTML = extra;
     doneDlg.querySelector('.ld-actions').innerHTML = actions.map(([act, label, primary]) =>
       `<button class="btn${primary ? ' primary' : ''}" type="button" data-done="${act}">${label}</button>`).join('');
-    doneDlg.classList.toggle('perfect', icon === '🎉' || icon === '🎓');
+    doneDlg.classList.toggle('perfect', ['🎉', '🎓', '🏆'].includes(icon));
     // let the last move finish animating before the window pops up
     clearTimeout(doneTimer);
     doneTimer = setTimeout(() => {
@@ -427,9 +427,27 @@ export function render(root, { id, query }) {
       case 'next': start(lines[posOf(lineIdx) % lines.length].idx); break;
       case 'again': start(lineIdx); break;
       case 'practice': mode = 'practice'; start(lineIdx); break;
+      case 'practiceall': mode = 'practice'; start(pickLine(opening, -1, level, mode)); break;
       case 'playon': $('[data-act="playon"]').click(); break;
+      case 'home': location.hash = '#/'; break;
     }
   });
+
+  /** Shown once, when the last line of the opening at this level has been learned. */
+  function showAllLearned() {
+    const p = openingProgress(opening, level);
+    const pct = Math.round(p.value * 100);
+    setStatus(`🏆 All ${p.total} lines learned! Keep practising to reach 100%.`, 'good');
+    showDone({
+      icon: '🏆',
+      title: 'All lines learned!',
+      sub: `Congratulations, you've learned every line of the ${opening.name} at ${LEVELS[level].name} level. Keep practising them from memory to reach 100%.`,
+      stats: `<div><b>${p.total} / ${p.total}</b><span>lines learned</span></div>
+        <div><b>${pct}%</b><span>progress</span></div>`,
+      extra: progressBar(p, { label: false }),
+      actions: [['home', '← Openings'], ['practiceall', 'Keep practising', true]],
+    });
+  }
 
   function complete() {
     phase = 'done';
@@ -471,7 +489,8 @@ export function render(root, { id, query }) {
       lineInfoEl.textContent = lineInfoEl.textContent.replace(/ · new, .*$/, ' · learned');
       renderLineList();
       setStatus(first ? '🎓 Line learned! Practice is now unlocked.' : '🎓 End of the line! Switch to Practice to test yourself.', 'good');
-      showDone({
+      if (first && lines.every((x) => lineUnlocked(opening.id, x.idx, level))) showAllLearned();
+      else showDone({
         icon: '🎓',
         title: first ? 'Line learned!' : 'End of the line!',
         sub: `You've seen every move of ${entry(lineIdx).name}. ${first ? 'Practice is unlocked: test yourself from memory.' : 'Now test yourself in Practice mode.'}`,
