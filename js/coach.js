@@ -5,6 +5,7 @@ import { NOTES } from './notes.js';
 import { LINE_NOTES } from './line-notes.js';
 import { LINE_NOTES_BLACK } from './line-notes-black.js';
 import { LINE_NOTES_D4 } from './line-notes-d4.js';
+import { LINE_NOTES_NEXT } from './line-notes-next.js';
 import { ROUTINE_NOTES } from './notes-routine.js';
 import { ROUTINE_NOTES_BLACK } from './notes-routine-black.js';
 import { DEEP_NOTES } from './line-notes-deep.js';
@@ -13,7 +14,7 @@ import { OPENINGS, lineMoves } from './openings.js';
 /** All theory notes keyed by the SAN sequence. notes.js wins over per-line notes. */
 export const THEORY = (() => {
   const map = {};
-  const all = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK };
+  const all = { ...LINE_NOTES, ...LINE_NOTES_D4, ...LINE_NOTES_BLACK, ...LINE_NOTES_NEXT };
   for (const o of OPENINGS) {
     (all[o.id] || []).forEach((entries, li) => {
       const mv = o.lines[li] ? lineMoves(o.lines[li]) : [];
