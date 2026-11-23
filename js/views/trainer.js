@@ -1,5 +1,5 @@
 import { getOpening, LEVELS, linesFor } from '../openings.js';
-import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK, recordLearned, lineUnlocked } from '../progress.js';
+import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK, recordLearned, lineUnlocked, knownPlies } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -109,6 +109,8 @@ export function render(root, { id, query }) {
   function setStatus(text, cls = '') { statusEl.className = 'status ' + cls; statusEl.innerHTML = text; }
   const coachOn = () => settings.coach !== false;
   const unlocked = () => lineUnlocked(opening.id, lineIdx, level);
+  /** Your first move in this line that you don't know from a lower level yet. */
+  const newFrom = (idx) => Math.ceil(knownPlies(opening.id, idx, level) / 2) + 1;
 
   // ---------------- Coach panel ----------------
   let coachEntries = [];
@@ -196,7 +198,7 @@ export function render(root, { id, query }) {
     q.title = open ? '' : `Complete ${QUIZ_UNLOCK} lines in Practice to unlock`;
   }
 
-  function start(idx) {
+  function start(idx, fromMoveOne = false) {
     closeDone();
     timers.forEach(clearTimeout); timers.clear();
     coachToken++;
@@ -210,10 +212,22 @@ export function render(root, { id, query }) {
     mistakes = 0; tries = 0; phase = 'book'; busy = false;
     openLines(false);
     renderLineList();
-    const st = lineStats(opening.id, idx);
+    const st = lineStats(opening.id, idx, level);
     lineInfoEl.textContent = `Line ${posOf(idx)}/${lines.length}: ${entry(idx).name} · ${LEVELS[level].name}, ${Math.ceil(moves.length / 2)} moves` +
-      (st ? ` · practised ${st.attempts}× · strength ${st.box}/5` : unlocked() ? ' · learned' : ' · new, 🔒 learn it to unlock Practice');
+      (st ? ` · practised ${st.attempts}× · strength ${st.box}/5` : unlocked() ? ' · learned' : knownPlies(opening.id, idx, level) ? ` · new from move ${newFrom(idx)}, 🔒 learn it to unlock Practice` : ' · new, 🔒 learn it to unlock Practice');
     coachIntro();
+    // Learn skips the moves you know from a lower level (Restart plays them too).
+    const known = mode === 'learn' ? knownPlies(opening.id, idx, level) : 0;
+    if (known && !fromMoveOne) {
+      moves.slice(0, known).forEach((s) => chess.move(s));
+      const n = Math.ceil(known / 2);
+      coachPush(`<div class="coach-entry intro"><p class="coach-idea">You already know the first ${n} moves from a lower level, so Learn starts after them. ↺ Restart plays the line from move 1.</p></div>`);
+      busy = true;
+      sync();
+      setStatus(`You know the first ${n} moves. Here's what comes next…`);
+      later(opponentMove, 1200);
+      return;
+    }
     sync();
     if (userColor === 'b') { busy = true; setStatus('Watch White\'s move…'); later(opponentMove, 500); }
     else promptUser();
@@ -224,8 +238,8 @@ export function render(root, { id, query }) {
     const list = $('.line-list');
     $('.lines-count').textContent = `${lines.length} lines · ${LEVELS[level].name}`;
     list.innerHTML = lines.map(({ idx: i, name }, n) => {
-      const st = lineStats(opening.id, i);
-      const meta = !st ? `<span class="li-new">${lineUnlocked(opening.id, i, level) ? 'Learned' : 'New'}</span>`
+      const st = lineStats(opening.id, i, level);
+      const meta = !st ? `<span class="li-new">${lineUnlocked(opening.id, i, level) ? 'Learned' : knownPlies(opening.id, i, level) ? `From move ${newFrom(i)}` : 'New'}</span>`
         : `<span class="li-level" title="Strength ${st.box}/5">${'●'.repeat(st.box)}${'○'.repeat(5 - st.box)}</span>`;
       return `<button type="button" class="line-item${i === lineIdx ? ' cur' : ''}" data-line="${i}">
         <span class="li-num">${n + 1}</span><span class="li-name">${esc(name)}</span>${meta}</button>`;
@@ -486,7 +500,7 @@ export function render(root, { id, query }) {
     } else {
       const first = !unlocked();
       recordLearned(opening.id, lineIdx, level);
-      lineInfoEl.textContent = lineInfoEl.textContent.replace(/ · new, .*$/, ' · learned');
+      lineInfoEl.textContent = lineInfoEl.textContent.replace(/ · new( from move \d+)?, .*$/, ' · learned');
       renderLineList();
       setStatus(first ? '🎓 Line learned! Practice is now unlocked.' : '🎓 End of the line! Switch to Practice to test yourself.', 'good');
       if (first && lines.every((x) => lineUnlocked(opening.id, x.idx, level))) showAllLearned();
@@ -536,7 +550,7 @@ export function render(root, { id, query }) {
         setStatus('Hint: move the highlighted piece.');
         break;
       }
-      case 'restart': start(lineIdx); break;
+      case 'restart': start(lineIdx, true); break;
       case 'next': start(lines[posOf(lineIdx) % lines.length].idx); break;
       case 'playon':
         phase = 'free';

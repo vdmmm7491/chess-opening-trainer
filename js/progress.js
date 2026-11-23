@@ -1,7 +1,7 @@
 // Progress tracking stored in localStorage (per device).
 // Use Export / Import on the Profile page to move progress between devices.
 
-import { LEVELS, LEVEL_KEYS, linesFor } from './openings.js';
+import { LEVELS, LEVEL_KEYS, linesFor, cutMoves, getOpening } from './openings.js';
 
 const KEY = 'opening-trainer.v1';
 const DAY = 86400000;
@@ -35,7 +35,8 @@ export function getSettings() { return state.settings; }
 export function setSetting(k, v) { state.settings[k] = v; save(); }
 
 // ---- Training level (Beginner / Amateur / Intermediate / Advanced) ----
-// Progress is kept per level: a line learned to move 6 is not the same as the full line.
+// Progress is saved per level, because a line learned to move 6 is not the same as the full line,
+// but it is shared when read (see "Synced levels" below).
 // Advanced uses the plain `openingId:lineIndex` key, so progress saved before levels existed
 // (when lines were trained in full) stays with the full lines.
 
@@ -43,20 +44,74 @@ export function setSetting(k, v) { state.settings[k] = v; save(); }
 export function getLevel() {
   const l = state.settings.level;
   if (LEVELS[l]) return l;
-  return Object.keys(state.lines).length ? 'advanced' : 'beginner';
+  return Object.keys(state.lines).some((k) => !k.includes('@')) ? 'advanced' : 'beginner';
 }
 export function setLevel(l) { if (LEVELS[l]) setSetting('level', l); }
 
 const keyOf = (openingId, lineIdx, level) =>
   level === 'advanced' ? `${openingId}:${lineIdx}` : `${openingId}:${lineIdx}@${level}`;
 
+// ---- Synced levels ----
+// A line is the same at every level, only cut shorter, so what you did at one level counts at the
+// others: a cut that contains this line counts in full, a cut that is the start of it counts for
+// its share of the moves.
+
+const cutCache = new Map(); // opening id -> every line at every level: { key, str, n }
+function cutsOf(openingId) {
+  if (!cutCache.has(openingId)) {
+    const o = getOpening(openingId);
+    const out = new Map();
+    o?.lines.forEach((line, i) => LEVEL_KEYS.forEach((level) => {
+      const mv = cutMoves(o, line, level);
+      const key = keyOf(openingId, i, level);
+      out.set(key, { key, str: mv.join(' '), n: mv.length });
+    }));
+    cutCache.set(openingId, out);
+  }
+  return cutCache.get(openingId);
+}
+
+/** Saved work on other cuts that contain this line at this level. */
+function related(openingId, lineIdx, level) {
+  const cuts = cutsOf(openingId);
+  const own = keyOf(openingId, lineIdx, level);
+  const me = cuts.get(own);
+  const full = [];
+  if (me) for (const c of cuts.values()) {
+    if (c.key === own || !(state.lines[c.key] || state.studied?.[c.key])) continue;
+    if (c.str === me.str || c.str.startsWith(me.str + ' ')) full.push(c);
+  }
+  return { own, full };
+}
+
+/** The shorter cuts of this line at lower levels: [{ level, share of its moves, n plies }]. */
+function starts(openingId, lineIdx, level) {
+  const cuts = cutsOf(openingId);
+  const n = (l) => cuts.get(keyOf(openingId, lineIdx, l))?.n || 0;
+  const moves = (plies) => Math.ceil(plies / 2); // 11 or 12 plies are 6 of your moves
+  return LEVEL_KEYS.slice(0, LEVEL_KEYS.indexOf(level)).filter((l) => n(l) < n(level))
+    .map((l) => ({ level: l, n: n(l), share: moves(n(l)) / moves(n(level)) }));
+}
+
+/**
+ * Practice stats of a line at a level. Work at a level that contains this line takes over when it
+ * is newer and stronger, so practising deeper never lowers your progress here.
+ */
 export function lineStats(openingId, lineIdx, level = getLevel()) {
-  return state.lines[keyOf(openingId, lineIdx, level)] || null;
+  const { own, full } = related(openingId, lineIdx, level);
+  let best = state.lines[own] || null;
+  for (const c of full) {
+    const s = state.lines[c.key];
+    if (s && (!best || (s.last > best.last && s.box > best.box))) best = s;
+  }
+  return best;
 }
 
 export function recordLine(openingId, lineIdx, mistakes, level = getLevel()) {
   const key = keyOf(openingId, lineIdx, level);
+  const synced = lineStats(openingId, lineIdx, level); // carry on from the strength shown
   const s = state.lines[key] || { attempts: 0, perfect: 0, mistakes: 0, box: 0, due: 0, last: 0 };
+  if (synced) s.box = synced.box;
   s.attempts++;
   s.mistakes += mistakes;
   if (mistakes === 0) { s.perfect++; s.box = Math.min(5, s.box + 1); }
@@ -82,12 +137,19 @@ export function recordLearned(openingId, lineIdx, level = getLevel()) {
 }
 
 /**
- * Is Practice unlocked for this line at this level? Yes once it was learned at this level or a
- * deeper one (which contains it). Lines practised before the lock existed count as learned.
+ * Is Practice unlocked for this line at this level? Yes once it was learned at this level or at
+ * one that contains it. Lines practised before the lock existed count as learned.
  */
 export function lineUnlocked(openingId, lineIdx, level = getLevel()) {
-  return LEVEL_KEYS.slice(LEVEL_KEYS.indexOf(level)).some((l) =>
-    !!state.studied?.[keyOf(openingId, lineIdx, l)] || (lineStats(openingId, lineIdx, l)?.attempts || 0) > 0);
+  const { own, full } = related(openingId, lineIdx, level);
+  return !!(state.studied?.[own] || state.lines[own] || full.length);
+}
+
+/** A line you haven't learned yet: how many plies at its start you know from a lower level (0 = none). */
+export function knownPlies(openingId, lineIdx, level = getLevel()) {
+  if (lineUnlocked(openingId, lineIdx, level)) return 0;
+  return Math.max(0, ...starts(openingId, lineIdx, level)
+    .filter((c) => lineUnlocked(openingId, lineIdx, c.level)).map((c) => c.n));
 }
 
 /** Can you practise anything in this opening yet? */
@@ -99,11 +161,15 @@ export function practiceUnlocked(opening, level = getLevel()) {
 // the rest comes from its spaced-repetition level (box 0..5).
 const PLAYED_CREDIT = 0.2;
 
-/** 0..1 progress of one line: 0 unseen, 0.2 once completed, 1 at level 5. */
+const creditOf = (s) => (s?.attempts ? PLAYED_CREDIT + (1 - PLAYED_CREDIT) * (s.box / 5) : 0);
+
+/**
+ * 0..1 progress of one line: 0 unseen, 0.2 once completed, 1 at strength 5. Practising the start
+ * of it at another level counts for that share of the moves.
+ */
 export function lineProgress(openingId, lineIdx, level = getLevel()) {
-  const s = lineStats(openingId, lineIdx, level);
-  if (!s || !s.attempts) return 0;
-  return PLAYED_CREDIT + (1 - PLAYED_CREDIT) * (s.box / 5);
+  return Math.max(creditOf(lineStats(openingId, lineIdx, level)),
+    ...starts(openingId, lineIdx, level).map((c) => creditOf(lineStats(openingId, lineIdx, c.level)) * c.share));
 }
 
 /** The line indexes you train in this opening at your level. */

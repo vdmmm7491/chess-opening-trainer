@@ -35,14 +35,14 @@ export function render(root) {
   root.appendChild(act);
 
   // Per-opening table: only the openings you've started (completed at least one line in Practice)
-  const started = OPENINGS.map((o) => ({ o, p: openingProgress(o) })).filter(({ p }) => p.played > 0);
+  const started = OPENINGS.map((o) => ({ o, p: openingProgress(o) })).filter(({ p }) => p.value > 0);
   const rows = started.map(({ o, p }) => {
     const lines = linesFor(o, getLevel()).map(({ idx: i, name }) => {
       const st = lineStats(o.id, i);
       const lp = Math.round(lineProgress(o.id, i) * 100);
       const due = st && st.due > Date.now() ? `review in ${Math.ceil((st.due - Date.now()) / 86400000)}d` : '<span class="warn">due</span>';
       return `<div class="kv"><a href="#/train/${o.id}?mode=practice&line=${i}">${esc(name)}</a>
-        <span class="muted">${st ? `${lp}% · strength ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : 'not started'}</span></div>`;
+        <span class="muted">${st ? `${lp}% · strength ${st.box}/5 · ${st.perfect}/${st.attempts} perfect · ${due}` : lp ? `${lp}% · from a lower level` : 'not started'}</span></div>`;
     }).join('');
     return `<tr><td><b>${esc(o.name)}</b> <span class="tag ${o.side}">${o.side === 'w' ? 'W' : 'B'}</span>
       <div style="margin-top:6px">${progressBar(p)}</div>
