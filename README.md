@@ -4,11 +4,11 @@
 
 # Opening Trainer
 
+## 👉 [vdmmm7491.github.io/chess-opening-trainer](https://vdmmm7491.github.io/chess-opening-trainer/)
+
 **Learn your chess openings by playing them, not by reading about them.**
 
 Free, open source, runs in your browser. No account, no install, no ads.
-
-### [▶ Try it now](https://vdmmm7491.github.io/chess-opening-trainer/)
 
 <img src="docs/screenshots/home.png" alt="The openings page, with rating filters and progress for each opening" width="900">
 
