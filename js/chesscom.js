@@ -1,7 +1,7 @@
 // Chess.com public API helpers (no login needed – the API is public and CORS-enabled).
 // Docs: https://www.chess.com/news/view/published-data-api
 import { Chess, findBook } from './ui.js';
-import { classify, isSacrifice, drop, DROP, NEGATIVE } from './classify.js';
+import { classify, isSacrifice, drop, DROP, NEGATIVE, refineKind } from './classify.js';
 import { OPENINGS, lineMoves } from './openings.js';
 
 const API = 'https://api.chess.com/pub/player/';
@@ -311,7 +311,11 @@ const REVIEW_KEY = 'opening-trainer.reviews.v3', MAX_REVIEWS = 40;
 const reviews = (() => { try { return new Map(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Map(); } })();
 
 /** @returns {{moves:Array, full:boolean}|null} */
-export const getReview = (url) => (url && reviews.get(url)) || null;
+export function getReview(url) {
+  const r = (url && reviews.get(url)) || null;
+  // Reviews saved before the Precise class existed: re-split their top / solid moves.
+  return r && { ...r, moves: r.moves.map((m) => ({ ...m, kind: refineKind(m.kind, m.drop) })) };
+}
 
 export function saveReview(url, moves, full) {
   if (!url) return;

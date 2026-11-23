@@ -3,7 +3,7 @@ import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
 import { h, esc, Chess, EvalBar, destsFn, checkSquare, lastMoveOf, renderMoveList, makeAnalyser, findBook } from '../ui.js';
 import { engineCheck, getReview, saveReview, moveLabel, mistakesOf } from '../chesscom.js';
-import { CLASSES, badgeHtml, legendHtml } from '../classify.js';
+import { CLASSES, badgeHtml, legendHtml, gameAccuracy } from '../classify.js';
 import { explainMove, noteFor, analyseMistake, materialWords } from '../coach.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -354,7 +354,27 @@ export function render(root, { query }) {
     if (!playable && res.steps.length) replay(res);
   }
 
-  const titleHtml = () => `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+  const titleHtml = () => `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>${summaryHtml()}`;
+  // Accuracy of both sides and how many moves got each label, once the review is ready.
+  let countsOpen = false;
+  function summaryHtml() {
+    if (!reviewMoves) return '';
+    const side = (mine) => reviewMoves.filter((m) => m.mine === mine);
+    const you = side(true), opp = side(false);
+    const acc = (ms) => { const a = gameAccuracy(ms.map((m) => m.drop || 0)); return a == null ? '–' : a.toFixed(1); };
+    const count = (ms) => ms.reduce((n, m) => (n[m.kind] = (n[m.kind] || 0) + 1, n), {});
+    const cy = count(you), co = count(opp);
+    const rows = Object.keys(CLASSES).filter((k) => cy[k] || co[k]).map((k) =>
+      `<tr><td>${cy[k] || '–'}</td><td class="gr-c">${badgeHtml(k)} ${CLASSES[k].label}</td><td>${co[k] || '–'}</td></tr>`).join('');
+    return `<div class="rv-acc">
+        <div class="rv-acc-box mine"><span class="rv-acc-n">${acc(you)}</span><span class="muted">Your accuracy</span></div>
+        <div class="rv-acc-box"><span class="rv-acc-n">${acc(opp)}</span><span class="muted">${query.vs ? esc(query.vs) : 'Opponent'}</span></div>
+      </div>
+      <details class="rv-counts"${countsOpen ? ' open' : ''}><summary>Move ratings</summary>
+        <table class="greport"><thead><tr><th>You</th><th></th><th>${query.vs ? esc(query.vs) : 'Opponent'}</th></tr></thead><tbody>${rows}</tbody></table>
+      </details>`;
+  }
+  view.addEventListener('toggle', (e) => { if (e.target.classList?.contains('rv-counts')) countsOpen = e.target.open; }, true);
   const chipsHtml = (cur) => !items.length ? '' : `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
       <div class="btn-row" style="margin-top:4px">${items.slice(0, 6).map((e, i) => `<button class="btn small${e.ply === cur ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}</button>`).join('')}</div></div>`;
 

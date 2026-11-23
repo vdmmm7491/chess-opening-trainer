@@ -4,6 +4,7 @@
 import { Chess, findBook } from './ui.js';
 import { classifyMove } from './chesscom.js';
 import { RATINGS } from './game-ratings.js';
+import { drop, refineKind } from './classify.js';
 
 const KEY = 'opening-trainer.famous-games.v1';
 const VERSION = 4; // bump when the method changes, so old results are redone
@@ -24,11 +25,20 @@ function saveAll(all) {
 export function savedAnnotation(id, sans) {
   // Ratings shipped with the site (made with tools/rate-games.html at a greater depth) come first.
   const shipped = RATINGS[id];
-  if (shipped && shipped.key === sans.join(' ')) return { ...shipped, moves: shipped.moves.slice(), done: true };
+  if (shipped && shipped.key === sans.join(' ')) return { ...shipped, moves: refine(shipped.moves), done: true };
   const rec = loadAll()[id];
-  if (rec && rec.v === VERSION && rec.depth === ANNOTATE_DEPTH && rec.key === sans.join(' ') && Array.isArray(rec.moves)) return rec;
+  if (rec && rec.v === VERSION && rec.depth === ANNOTATE_DEPTH && rec.key === sans.join(' ') && Array.isArray(rec.moves)) return { ...rec, moves: refine(rec.moves) };
   return fresh(sans);
 }
+/** Expected score (0..1) a saved move gave away, from the eval before it and the centipawns lost. */
+export function moveDrop(m, ply) {
+  if (!m?.e || m.l == null) return null;
+  const best = Math.max(-1500, Math.min(1500, (ply % 2 === 0 ? 1 : -1) * m.e.whiteCp));
+  return drop(best, best - m.l);
+}
+// Ratings made before the Precise class existed: re-split their top / solid moves.
+const refine = (moves) => moves.map((m, ply) => (m && (m.k === 'top' || m.k === 'solid') ? { ...m, k: refineKind(m.k, moveDrop(m, ply)) } : m));
+
 const fresh = (sans) => ({ v: VERSION, depth: ANNOTATE_DEPTH, key: sans.join(' '), moves: [], final: null, done: false });
 
 /**

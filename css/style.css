@@ -644,6 +644,16 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .greport th { font-size: 0.78rem; font-weight: 600; color: var(--muted); padding-bottom: 4px; width: 30%; overflow-wrap: anywhere; }
 .greport td { text-align: center; padding: 2px 0; font-variant-numeric: tabular-nums; font-weight: 700; }
 .greport td.gr-c { font-weight: 500; white-space: nowrap; text-align: left; padding-left: 12px; }
+.greport tr.gr-accrow td { padding-bottom: 6px; border-bottom: 1px solid var(--border, rgba(127,127,127,.25)); }
+.greport .gr-acc { font-size: 1.05rem; }
+/* Game review: accuracy of both sides */
+.rv-acc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 8px; }
+.rv-acc-box { display: flex; flex-direction: column; align-items: center; padding: 8px 6px; border-radius: 10px; background: rgba(127,127,127,.12); font-size: .8rem; text-align: center; overflow-wrap: anywhere; }
+.rv-acc-box.mine { box-shadow: inset 0 0 0 2px var(--accent, #3b82f6); }
+.rv-acc-n { font-size: 1.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rv-counts { margin: 0 0 10px; font-size: .88rem; }
+.rv-counts summary { cursor: pointer; color: var(--muted); }
+.rv-counts .greport { margin-top: 6px; }
 @media (max-width: 900px) {
   /* Keep board, commentary and moves on one screen. */
   .game-view .board-wrap { max-width: min(100%, 58vh); }

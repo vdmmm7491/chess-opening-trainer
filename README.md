@@ -81,7 +81,7 @@ Daily streak, an activity calendar, and how well you know each opening and line.
 </tr>
 </table>
 
-- **Game review.** Enter your Chess.com username to see how you score with each opening and the moves where you left your repertoire, then have Stockfish rate every move of any game.
+- **Game review.** Enter your Chess.com username to see how you score with each opening and the moves where you left your repertoire, then have Stockfish rate every move of any game and give both players an accuracy score.
 - **Play on.** When the book line ends, keep playing the position against Stockfish.
 - **Draw on the board.** Right-click and drag for arrows, right-click a square to highlight it.
 - **Make it yours.** 6 piece sets, 6 board colours, dark or light theme.

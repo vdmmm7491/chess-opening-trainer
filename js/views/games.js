@@ -5,9 +5,9 @@ import { getEngine, formatEval } from '../engine.js';
 import { Board } from '../board.js';
 import { getSettings } from '../progress.js';
 import { h, esc, Chess, EvalBar, checkSquare, makeAnalyser, pvToSan } from '../ui.js';
-import { CLASSES, NEGATIVE, badgeHtml } from '../classify.js';
+import { CLASSES, NEGATIVE, badgeHtml, gameAccuracy } from '../classify.js';
 import { explainMove, noteFor } from '../coach.js';
-import { annotateGame, savedAnnotation } from '../game-annotate.js';
+import { annotateGame, savedAnnotation, moveDrop } from '../game-annotate.js';
 
 const moveNo = (ply, san) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
 
@@ -153,6 +153,7 @@ function viewer(root, id) {
     const cls = CLASSES[a.k];
     let txt;
     if (NEGATIVE.includes(a.k)) txt = `Stockfish: this costs about <b>${(a.l / 100).toFixed(1)}</b> pawns. Better was <b>${esc(a.b)}</b>.`;
+    else if (a.k === 'precise') txt = `Stockfish: a strong move, very close to its choice, <b>${esc(a.b)}</b>.`;
     else if (a.k === 'solid') txt = `Stockfish: a good move. It slightly preferred <b>${esc(a.b)}</b>.`;
     else if (a.k === 'theory') txt = 'Opening theory: this move is in the trainer\'s repertoire.';
     else if (a.k === 'masterstroke') txt = 'Stockfish agrees: a sound sacrifice, and the best move.';
@@ -186,7 +187,7 @@ function viewer(root, id) {
   }
 
   // ---------- report ----------
-  const REPORT = ['masterstroke', 'only', 'top', 'solid', 'theory', 'dubious', 'mistake', 'blunder'];
+  const REPORT = ['masterstroke', 'only', 'top', 'precise', 'solid', 'theory', 'dubious', 'mistake', 'blunder'];
   function report() {
     const done = rec.moves.filter(Boolean).length;
     const prog = $('.gc-progress');
@@ -200,7 +201,14 @@ function viewer(root, id) {
       return n;
     };
     const w = count(0), b = count(1);
-    const rows = REPORT.filter((k) => w[k] || b[k]).map((k) =>
+    // Accuracy from the engine's ratings (book moves count as perfect).
+    const acc = (side) => {
+      const drops = [];
+      rec.moves.forEach((m, i) => { if (i % 2 !== side || !m?.k) return; const d = m.k === 'theory' ? 0 : moveDrop(m, i); if (d != null) drops.push(d); });
+      const a = gameAccuracy(drops);
+      return a == null ? '–' : `<b class="gr-acc">${a.toFixed(1)}</b>`;
+    };
+    const rows = (done ? `<tr class="gr-accrow"><td>${acc(0)}</td><td class="gr-c">Accuracy</td><td>${acc(1)}</td></tr>` : '') + REPORT.filter((k) => w[k] || b[k]).map((k) =>
       `<tr><td>${w[k] || '–'}</td><td class="gr-c">${badgeHtml(k)} ${CLASSES[k].label}</td><td>${b[k] || '–'}</td></tr>`).join('');
     $('.gc-report').innerHTML = `<h2 style="margin:0 0 6px;font-size:1.05rem">Game report${annotating ? ' <span class="muted" style="font-weight:400;font-size:.8rem">(in progress)</span>' : ''}</h2>
       ${rows ? `<table class="greport"><thead><tr><th>${esc(g.white)}</th><th></th><th>${esc(g.black)}</th></tr></thead><tbody>${rows}</tbody></table>`
