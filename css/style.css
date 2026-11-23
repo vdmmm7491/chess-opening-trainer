@@ -216,7 +216,7 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 
 /* ---------- board layout ---------- */
 .play-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 18px; align-items: start; }
-.board-wrap { display: flex; gap: 8px; align-items: stretch; width: 100%; max-width: min(660px, calc(100vh - 130px)); margin: 0 auto; }
+.board-wrap { display: flex; gap: 8px; align-items: stretch; width: 100%; max-width: min(760px, calc(100vh - 120px)); margin: 0 auto; }
 .board-wrap .board { flex: 1; }
 .side { display: flex; flex-direction: column; gap: 12px; }
 
@@ -605,7 +605,7 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .game-row:hover, .game-row:focus-visible { background: var(--panel-hover); outline: none; }
 
 /* Big previous/next buttons right under the board (easy to tap on phones) */
-.board-nav { display: flex; gap: 8px; width: 100%; max-width: min(660px, calc(100vh - 130px)); margin: 10px auto 0; }
+.board-nav { display: flex; gap: 8px; width: 100%; max-width: min(760px, calc(100vh - 120px)); margin: 10px auto 0; }
 .board-nav .btn { flex: 1; min-height: 52px; font-size: 1.4rem; padding: 8px 4px; touch-action: manipulation; }
 .board-nav .btn[data-act="play"] { flex: 1.6; font-size: 1.05rem; }
 @media (max-width: 900px) { .board-nav { max-width: 100%; } }
@@ -725,17 +725,17 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .trainer-view .board-col {
     display: flex; flex-direction: column; gap: 10px; width: 100%; margin: 0 auto;
     /* leave room under the board for the coach and the buttons */
-    max-width: 880px; /* coach and buttons use the full width, so they stay short */
+    max-width: 980px; /* coach and buttons use the full width, so they stay short */
   }
   /* the board itself shrinks with the window height to leave room for the coach */
-  .trainer-view .board-col .board-wrap { max-width: max(360px, min(680px, calc(100vh - 470px))); }
+  .trainer-view .board-col .board-wrap { max-width: max(440px, min(780px, calc(100vh - 380px))); }
   .trainer-view .board-col .card { padding: 10px 12px; }
   .trainer-view .coach-head { margin-bottom: 4px; }
   /* only the newest coach message, so the panel stays short */
   .trainer-view .coach-body .coach-entry:not(:first-child) { display: none; }
 }
 @media (min-width: 1100px) {
-  .trainer-view .board-col .board-wrap { max-width: max(380px, min(860px, calc(100vh - 480px))); }
+  .trainer-view .board-col .board-wrap { max-width: max(460px, min(960px, calc(100vh - 380px))); }
 }
 @media (max-width: 900px) {
   /* phones: one column — board, move status, coach, buttons, then the rest */
@@ -764,3 +764,33 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 /* coach: refutation line and Replay / Try again on one row */
 .ref-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
 .ref-line .coach-btns { display: inline-flex; gap: 6px; margin-left: auto; }
+
+/* ---------- trainer: "line complete" window ---------- */
+dialog.line-done {
+  border: 1px solid var(--border); border-radius: 16px; background: var(--panel); color: var(--text);
+  padding: 26px 24px 20px; width: min(420px, calc(100vw - 32px)); text-align: center;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+}
+dialog.line-done[open] { animation: ld-pop .35s cubic-bezier(.2,1.3,.4,1); }
+dialog.line-done::backdrop { background: rgba(0,0,0,0.55); animation: ld-fade .25s ease-out; }
+dialog.line-done.perfect { border-color: color-mix(in srgb, var(--good) 55%, var(--border)); }
+.line-done .ld-close { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: var(--muted); font-size: 1.1rem; cursor: pointer; padding: 6px; }
+.line-done .ld-close:hover { color: var(--text); }
+.line-done .ld-icon { font-size: 3.2rem; line-height: 1; }
+.line-done.perfect .ld-icon { animation: ld-bounce .9s ease-out .2s; }
+.line-done .ld-title { margin: 10px 0 4px; }
+.line-done .ld-sub { margin: 0 0 14px; }
+.line-done .ld-stats { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; }
+.line-done .ld-stats:empty { display: none; }
+.line-done .ld-stats > div { flex: 1; background: var(--panel-2); border-radius: 10px; padding: 10px 6px; display: flex; flex-direction: column; gap: 2px; }
+.line-done .ld-stats b { font-size: 1.35rem; }
+.line-done .ld-stats span { font-size: .8rem; color: var(--muted); }
+.line-done .ld-stars { color: var(--warn); font-size: 1.05rem !important; letter-spacing: 1px; line-height: 1.9rem; }
+.line-done .ld-stars .off { color: var(--muted); opacity: .35; font-size: inherit; }
+.line-done .ld-extra:not(:empty) { margin-bottom: 14px; }
+.line-done .ld-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.line-done .ld-actions .btn { flex: 1 1 0; white-space: nowrap; }
+@keyframes ld-pop { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes ld-fade { from { opacity: 0; } }
+@keyframes ld-bounce { 0%, 100% { transform: none; } 30% { transform: scale(1.3) rotate(-8deg); } 60% { transform: scale(.95) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { dialog.line-done[open], .line-done .ld-icon, dialog.line-done::backdrop { animation: none !important; } }
