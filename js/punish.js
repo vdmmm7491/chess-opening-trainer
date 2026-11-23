@@ -1,13 +1,15 @@
 // "Punish" mode: common opponent mistakes in each opening and how to punish them.
 // Keyed by opening id. Each entry:
-//   name:    short label for the picker (keep it short: phones)
+//   name:    short label, shown only once it's solved (keep it short: phones)
 //   moves:   SAN from the start up to and including the opponent's mistake
 //   punish:  your punishing moves, with the opponent's likely replies in between;
 //            starts and ends with YOUR move
-//   mistake: shown before you move: what's wrong with their move (don't give the answer away)
+//   mistake: the first hint (or after a wrong try): what's wrong with their move (don't give the answer away)
 //   why:     shown once you've found it: why the punishment works
 //   elo:     the lowest rating band where this mistake is typical (a band's min from BANDS)
 //   upTo:    optional: the highest band it still shows up in (classic traps catch strong players too)
+// The page shows the mistakes for your training level (LEVEL_BANDS) and the line you pick
+// (linesOf: matched by move prefix, so no line field is needed).
 // Every line was checked with Stockfish. Check edits with tools/validate.html.
 
 /** Rating bands for Punish mode. Fixed, so entries never need re-sorting. */
@@ -22,15 +24,39 @@ export const BANDS = [
   { min: 2000, max: Infinity, label: '2000+' },
 ];
 
-/** The band (its min) for a rating number, e.g. 820 -> 750. */
-export function bandFor(rating) {
-  const r = Number(rating) || 0;
-  return [...BANDS].reverse().find((b) => r >= b.min).min;
-}
-
 /** Does this entry belong in the band that starts at `min`? */
 export function inBand(e, min) {
   return min >= e.elo && min <= (e.upTo ?? e.elo);
+}
+
+/** The rating bands each training level (LEVELS in openings.js) covers. */
+export const LEVEL_BANDS = {
+  beginner: [0, 500, 750],
+  amateur: [1000, 1250],
+  intermediate: [1500, 1750],
+  advanced: [2000],
+};
+
+/** Is this mistake typical for players at a training level? */
+export function forLevel(e, level) {
+  return (LEVEL_BANDS[level] || []).some((min) => inBand(e, min));
+}
+
+/**
+ * The lines of `opening` a mistake belongs to (indexes into opening.lines): the ones that
+ * share the most moves with the position before the mistake. A mistake on move 2 or 3
+ * that every line shares (a Scholar's mate try, say) belongs to all of them.
+ */
+export function linesOf(opening, e) {
+  const setup = e.moves.trim().split(/\s+/).slice(0, -1);
+  let best = 0, out = [];
+  opening.lines.forEach((line, i) => {
+    const mv = line.moves.trim().split(/\s+/);
+    let k = 0;
+    while (k < setup.length && mv[k] === setup[k]) k++;
+    if (k > best) { best = k; out = [i]; } else if (k === best) out.push(i);
+  });
+  return best >= 2 ? out : [];
 }
 
 export const PUNISH = {
@@ -101,6 +127,24 @@ export const PUNISH = {
       mistake: 'The queen attacks b5 and g2 at once, but it can be kicked with tempo. The book move is 7...Qg5.',
       why: '8.c4 chases the queen and keeps your bishop defended. After 8...Qd6 9.Nxa7+ wins a pawn with check, and after the bishop trade 11.Qh5+ keeps the black king on the run: you are two pawns up.',
     },
+    {
+      name: '5...Nf6? Exchange, e5 drops',
+      elo: 1000,
+      upTo: 1250,
+      moves: 'e4 e5 Nf3 Nc6 Bb5 a6 Bxc6 dxc6 O-O Nf6',
+      punish: 'Nxe5',
+      mistake: 'Developing looks natural, but after the exchange on c6 the e5 pawn is only guarded by the queen trick ...Qd4, and with your king castled that trick no longer works.',
+      why: '6.Nxe5 just wins the pawn. If 6...Nxe4, 7.Re1 hits the knight on the open e-file and Black can\'t keep the extra pawn. The book move 5...f6 (or ...Bg4, ...Qd6) protects e5 first.',
+    },
+    {
+      name: '5...d6? pinned knight',
+      elo: 1000,
+      upTo: 1500,
+      moves: 'e4 e5 Nf3 Nc6 Bb5 Bc5 c3 Nf6 O-O d6',
+      punish: 'd4 Bb6 d5',
+      mistake: '...d6 is a normal developing pawn move, but look at the diagonal from your bishop on b5 to the black king: the c6 knight is now pinned.',
+      why: '6.d4 gains time on the c5 bishop, and after 6...Bb6 7.d5 the pawn attacks the pinned knight. It can\'t move without exposing the king, so Black loses a piece or has to wreck the queenside to save it.',
+    },
   ],
 
   scotch: [
@@ -121,6 +165,24 @@ export const PUNISH = {
       punish: 'Bf3 Qh3 Nxc7+ Kd8 Nxa8',
       mistake: 'The queen grabs a second pawn and hits your rook, but forgets your threat on c7.',
       why: '8.Bf3 saves the rook with tempo. After 8...Qh3 9.Nxc7+ forks king and rook, and 10.Nxa8 wins a whole rook.',
+    },
+    {
+      name: '5...Nf6? queen runs out of squares',
+      elo: 1250,
+      upTo: 1500,
+      moves: 'e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Qh4 Nc3 Nf6',
+      punish: 'Nf5 Qg4 f3',
+      mistake: 'Developing the knight is natural, but the queen on h4 now has few safe squares, and g7 is only guarded by the bishop on f8.',
+      why: '6.Nf5 hits the queen and threatens Nxg7+. After 6...Qg4 7.f3 the queen is kicked again, you gain time with every move and Black\'s kingside is in trouble.',
+    },
+    {
+      name: '8...Nf6? c7 fork',
+      elo: 750,
+      upTo: 1000,
+      moves: 'e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Qh4 Nc3 Bb4 Be2 Qxe4 Nb5 Bxc3+ bxc3 Nf6',
+      punish: 'Nxc7+ Kd8 Nxa8',
+      mistake: 'Black has grabbed a pawn and develops, but forgot what your knight on b5 was aiming at. The book move here is 8...Kd8, getting the king off the e-file and away from the fork.',
+      why: '9.Nxc7+ forks the king and the rook on a8. After 9...Kd8 10.Nxa8 you are a whole rook up for a pawn or two.',
     },
   ],
 
@@ -169,6 +231,24 @@ export const PUNISH = {
       punish: 'e4 Bb4 exd5 Bxc3+ bxc3 Qxd5 Be2',
       mistake: 'Grabbing space with ...c4 releases the pressure on d4, and the isolated d5 pawn has no pawn support left.',
       why: '6.e4 breaks open the centre at once. After 6...Bb4 7.exd5 Bxc3+ 8.bxc3 Qxd5 9.Be2 Black\'s king is still in the middle and you are well ahead in development.',
+    },
+    {
+      name: '10...Nxc3? the in-between move',
+      elo: 1500,
+      upTo: 2000,
+      moves: 'd4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7 Rc1 c6 Bd3 dxc4 Bxc4 Nd5 Bxe7 Nxc3',
+      punish: 'Bxd8 Nxd1 Be7',
+      mistake: 'Black takes on c3 first and plans to take back on e7 next. But your bishop on e7 isn\'t stuck there: it can take something too.',
+      why: '11.Bxd8 takes the queen first. After 11...Nxd1 12.Be7! the bishop escapes with tempo on the f8 rook, and once you take back on d1 you are an exchange up. Black should recapture 10...Qxe7.',
+    },
+    {
+      name: '5...b5? Slav, holding c4',
+      elo: 1000,
+      upTo: 1250,
+      moves: 'd4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 b5',
+      punish: 'axb5 cxb5 Nxb5',
+      mistake: 'Black wants to keep the extra pawn on c4, but the pawn chain on b5 and c6 can be undermined, and your a-pawn and knight are both ready.',
+      why: '6.axb5 cxb5 7.Nxb5: you win back the pawn with a knight on b5 eyeing c7 and d6, and the c4 pawn is still weak. That\'s why 5...Bf5 is the book move.',
     },
   ],
 
@@ -230,6 +310,24 @@ export const PUNISH = {
       mistake: 'Breaking with ...d5 here runs into your g2 bishop, which looks straight down the long diagonal at d5.',
       why: 'After 5.cxd5 Black can\'t take back safely: 5...Nxd5 6.Nxd5 Qxd5?? 7.Bxd5 wins the queen. Black\'s best, 5...Nb4, regains the pawn but leaves you well ahead in development.',
     },
+    {
+      name: '3...Nd7? blocks the queen',
+      elo: 1000,
+      upTo: 1250,
+      moves: 'c4 e6 Nc3 d5 d4 Nd7',
+      punish: 'cxd5 exd5 Nxd5',
+      mistake: 'The knight looks fine on d7, but count the defenders of d5 now. The queen used to guard it along the d-file.',
+      why: '4.cxd5 exd5 5.Nxd5: with the knight on d7 in the way, the queen no longer protects d5, so you win a clean centre pawn.',
+    },
+    {
+      name: '3...d5? e5 left behind',
+      elo: 750,
+      upTo: 1250,
+      moves: 'c4 e5 Nc3 Nf6 Nf3 d5',
+      punish: 'cxd5 Nxd5 Nxe5',
+      mistake: 'Black copies an Open Sicilian break, but here it is your knight on f3 that\'s already attacking e5, and the knight on f6 is about to leave.',
+      why: '4.cxd5 Nxd5 5.Nxe5: the f6 knight was the only piece guarding e5, so you win a pawn. Black needed 3...Nc6 first.',
+    },
   ],
 
   vienna: [
@@ -278,6 +376,24 @@ export const PUNISH = {
       mistake: 'The queen comes out early and your knights can chase it with tempo.',
       why: '4.Nd5 hits the queen and c7. After 4...Qd8 5.Nxe5 you have won a central pawn and Black is undeveloped.',
     },
+    {
+      name: '3...exf4? knight gets kicked',
+      elo: 1000,
+      upTo: 1500,
+      moves: 'e4 e5 Nc3 Nf6 f4 exf4',
+      punish: 'e5',
+      mistake: 'Taking the gambit pawn looks greedy but fine. Which black piece is now standing right in front of your e-pawn?',
+      why: '4.e5! sends the knight back to g8 (4...Nh5 or ...Ng4 runs into trouble). You will win the f4 pawn back with Nf3, d4 and Bxf4, far ahead in development. The book move is 3...d5.',
+    },
+    {
+      name: '3...Na5? f7 and e5 both loose',
+      elo: 750,
+      upTo: 1250,
+      moves: 'e4 e5 Nc3 Nc6 Bc4 Na5',
+      punish: 'Bxf7+ Kxf7 Qh5+ g6 Qxe5',
+      mistake: 'Chasing the bishop looks active, but the knight on c6 was guarding e5, and f7 is only defended by the king.',
+      why: '4.Bxf7+ Kxf7 5.Qh5+ g6 6.Qxe5 takes back the piece-for-pawn with interest: the queen forks the a5 knight and the h8 rook, and Black\'s king has lost the right to castle.',
+    },
   ],
 
   // ---------------- You play Black ----------------
@@ -299,6 +415,15 @@ export const PUNISH = {
       punish: 'Nd4 Nxd4 Qh2#',
       mistake: 'Against the Smith-Morra (here with ...e6 and ...Qc7) White kicks the g4 knight, but your queen and knight are both aiming at h2.',
       why: '9...Nd4 attacks the queen. 10.Nxd4?? Qh2# (the g4 knight supports it). If the queen moves instead, 10...Nxf3+ wrecks White\'s king.',
+    },
+    {
+      name: '10.Bxf7+? sham sacrifice',
+      elo: 1250,
+      upTo: 1500,
+      moves: 'e4 c5 d4 cxd4 c3 dxc3 Nxc3 Nc6 Nf3 d6 Bc4 e6 O-O Nf6 Qe2 Be7 Rd1 e5 Bxf7+',
+      punish: 'Kxf7',
+      mistake: 'Sacrifices on f7 are a Morra Gambit favourite. Count White\'s follow-up checks before you get scared: is there actually anything behind this one?',
+      why: '10...Kxf7 just takes the bishop. After 11.Qc4+ Kf8 (or 11.Ng5+ Kg8) White has no more attackers to bring, and you are a whole piece up. White should play 10.Be3.',
     },
   ],
 
@@ -447,6 +572,15 @@ export const PUNISH = {
       mistake: 'The queen goes to b3 to keep hitting f7, but it is far from safe there.',
       why: '5...Nd4 hits the queen. 6.Bxf7+ Ke7 7.Qc4 b5 chases the queen and traps the f7 bishop: you win a piece for a pawn.',
     },
+    {
+      name: '9.Bb5? forgets e4',
+      elo: 1000,
+      upTo: 1500,
+      moves: 'e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d4 exd4 cxd4 Bb4+ Bd2 Bxd2+ Nbxd2 d5 Bb5',
+      punish: 'dxe4',
+      mistake: 'The bishop is attacked, so White moves it. But the bishop on c4 wasn\'t the only thing your ...d5 was hitting.',
+      why: '9...dxe4 wins a clean pawn: e4 was attacked twice and the bishop retreat left it with one defender. White had to play 9.exd5.',
+    },
   ],
 
   'kings-indian': [
@@ -459,6 +593,15 @@ export const PUNISH = {
       mistake: 'White grabs another pawn, but the c3 knight is pinned by your queen and can\'t defend e4.',
       why: '8...Nxe4 wins the e4 pawn, opens your g7 bishop\'s diagonal at c3 and leaves White\'s king stuck in the centre.',
     },
+    {
+      name: '6.h3? hole on g3',
+      elo: 1000,
+      upTo: 1500,
+      moves: 'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4 O-O h3',
+      punish: 'Nh5 g4 Ng3',
+      mistake: 'h3 prepares g4, a normal attacking idea, but with f4 and h3 both played, look at the dark square on g3 and the rook still on h1.',
+      why: '6...Nh5! hits f4 and eyes g3. After 7.g4 Ng3 the knight forks the rook on h1 and the bishop on f1, and you win the exchange. White should develop with 6.Nf3.',
+    },
   ],
 
   nimzo: [
@@ -470,6 +613,24 @@ export const PUNISH = {
       punish: 'Nxc3 bxc3 Bxc3',
       mistake: 'The knight breaks the pin on the e4 knight, but c3 is now attacked three times.',
       why: '7...Nxc3 8.bxc3 Bxc3 hits the a1 rook and pins the d2 knight. You win material.',
+    },
+    {
+      name: '10.Nc2? queen and bishop clash',
+      elo: 1500,
+      upTo: 2000,
+      moves: 'd4 Nf6 c4 e6 Nc3 Bb4 Nf3 c5 g3 cxd4 Nxd4 O-O Bg2 d5 cxd5 Nxd5 Qb3 Nc6 Nc2',
+      punish: 'Na5 Qxb4 Nxb4',
+      mistake: 'White attacks your bishop on b4 a second time. It looks like you must retreat, but check what defends b4 and what White\'s queen is doing on b3.',
+      why: '10...Na5! hits the queen. If 11.Qxb4 Nxb4 the knight on d5 takes the queen, so White loses the queen for a bishop. Moving the queen away doesn\'t help either: the c3 knight and the b2 pawn are left hanging. White needed 10.Nxc6.',
+    },
+    {
+      name: '7.e4? the pinned knight can\'t guard it',
+      elo: 1500,
+      upTo: 2000,
+      moves: 'd4 Nf6 c4 e6 Nc3 Bb4 Bg5 h6 Bh4 c5 d5 d6 e4',
+      punish: 'g5 Bg3 Nxe4',
+      mistake: 'e4 grabs the centre, but the only piece guarding it is the knight on c3, and that knight is pinned to the king.',
+      why: '7...g5 8.Bg3 Nxe4 wins a pawn: White can\'t take back on e4 because the c3 knight is pinned, and your bishop on b4 keeps it that way. White should play 7.e3.',
     },
   ],
 };
