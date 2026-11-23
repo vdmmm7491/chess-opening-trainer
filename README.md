@@ -34,13 +34,13 @@ After that, try **⚔️ Punish** (common opponent mistakes and how to punish th
 
 ## The openings
 
-**15 openings · 116 lines · a written explanation for every move.** Each line is trimmed to your level (Beginner, Amateur, Intermediate or Advanced) so you only learn as deep as you need.
+**24 openings · 172 lines · a written explanation for every move.** Each line is trimmed to your level (Beginner, Amateur, Intermediate or Advanced) so you only learn as deep as you need.
 
 | Tier | As White | As Black |
 | --- | --- | --- |
 | **First Openings**<br>simple plans, start here | Italian Game · Scotch Game · London System · Vienna Game · Alien Gambit | Caro-Kann · Scandinavian · 1…e5 Open Games |
-| **Next Steps**<br>more structure and theory | Ruy López · Queen's Gambit | French Defence |
-| **Master Class**<br>sharp or heavy theory | English Opening | Sicilian Najdorf · King's Indian · Nimzo-Indian |
+| **Next Steps**<br>more structure and theory | Ruy López · Queen's Gambit · Alapin Sicilian · Advance vs French & Caro-Kann | French Defence · Classical Sicilian · Accelerated Dragon · Slav Defence · Queen's Gambit Declined · Stonewall Dutch |
+| **Master Class**<br>sharp or heavy theory | English Opening · Catalan Opening | Sicilian Najdorf · Sicilian Dragon · King's Indian · Nimzo-Indian |
 
 ---
 
@@ -146,7 +146,7 @@ Never reorder or remove existing lines, because progress is keyed by line positi
 ```
 index.html              page shell and top navigation
 css/style.css           all styles
-js/app.js               hash routing and the Back button
+js/app.js               hash routing
 js/views/               one file per page (home, trainer, quiz, punish, games, analysis, progress, chesscom)
 js/openings.js          the repertoire: openings, tiers, levels, lines
 js/line-notes*.js       coach notes for every book move (js/notes*.js override them)
