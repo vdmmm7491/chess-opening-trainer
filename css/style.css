@@ -151,19 +151,35 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 }
 .opening-card .level-note { font-size: 0.85rem; color: var(--text); opacity: 0.85; }
 /* Opening tier slider (colours deliberately differ from the line levels) */
-.tier-box { --tier: var(--accent); --tier-pos: 0%; margin-bottom: 14px; border-top: 4px solid var(--tier); transition: border-color 0.25s; }
+.tier-box { --tier: var(--accent); margin-bottom: 14px; border-top: 4px solid var(--tier); transition: border-color 0.35s; }
 .tier-head { margin-bottom: 12px; }
-.tier-slider {
-  -webkit-appearance: none; appearance: none; width: 100%; height: 10px; margin: 6px 0 4px; border-radius: 999px; cursor: pointer;
-  background: linear-gradient(to right, var(--tier) var(--tier-pos), var(--panel-2) var(--tier-pos));
+/* Custom track + thumb (animated); the real range input sits invisibly on top for drag, click and keys */
+.tier-track { --p: 0; --thumb: 24px; position: relative; height: 32px; margin: 2px 0 4px; }
+.tier-track::before, .tier-fill {
+  content: ''; position: absolute; left: 0; top: 50%; height: 10px; margin-top: -5px; border-radius: 999px;
 }
-.tier-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--tier); border: 3px solid var(--panel); box-shadow: 0 0 0 2px var(--tier); transition: background 0.25s, box-shadow 0.25s;
+.tier-track::before { right: 0; background: var(--panel-2); }
+.tier-fill {
+  width: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p)); background: var(--tier);
+  transition: width 0.45s cubic-bezier(.22,1,.36,1), background-color 0.35s;
 }
-.tier-slider::-moz-range-thumb {
-  width: 20px; height: 20px; border-radius: 50%; background: var(--tier); border: 3px solid var(--panel); box-shadow: 0 0 0 2px var(--tier);
+.tier-stop {
+  position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p)); background: var(--muted); opacity: 0.6;
 }
+.tier-thumb {
+  position: absolute; top: 50%; width: var(--thumb); height: var(--thumb); margin: calc(var(--thumb) / -2) 0 0 calc(var(--thumb) / -2);
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p)); border-radius: 50%;
+  background: var(--tier); border: 3px solid var(--panel); box-shadow: 0 0 0 2px var(--tier), 0 2px 8px rgba(0,0,0,0.35);
+  transition: left 0.45s cubic-bezier(.22,1,.36,1), background-color 0.35s, box-shadow 0.35s, transform 0.15s;
+  pointer-events: none;
+}
+.tier-track:hover .tier-thumb, .tier-track.dragging .tier-thumb { transform: scale(1.12); }
+.tier-track.dragging .tier-thumb, .tier-track.dragging .tier-fill { transition-property: background-color, box-shadow, transform; }
+.tier-slider:focus-visible ~ .tier-thumb { box-shadow: 0 0 0 2px var(--tier), 0 0 0 6px color-mix(in srgb, var(--tier) 35%, transparent); }
+.tier-slider { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.tier-label { transition: color 0.35s; }
+@media (prefers-reduced-motion: reduce) { .tier-fill, .tier-thumb { transition: none; } }
 .tier-labels { display: flex; justify-content: space-between; gap: 8px; }
 .tier-label {
   background: none; border: 0; padding: 4px 0; cursor: pointer; font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--muted);

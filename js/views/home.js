@@ -3,6 +3,7 @@ import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, se
 import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
+import { animationsOn } from '../theme.js';
 
 let sideFilter = 'all';
 let lastSide = 'w'; // the side the White/Black toggle shows while "All" is selected
@@ -45,7 +46,12 @@ export function render(root) {
   let tier = TIERS[getSettings().tier] ? getSettings().tier : tierForLevel(level);
   const tierBox = h(`<div class="card tier-box">
     <div class="tier-head"><b>Openings</b> <span class="muted">Slide to pick how hard the openings are.</span></div>
-    <input type="range" class="tier-slider" min="0" max="${TIER_KEYS.length - 1}" step="1" aria-label="Opening tier">
+    <div class="tier-track">
+      <div class="tier-fill"></div>
+      ${TIER_KEYS.map((k, i) => `<span class="tier-stop" style="--p:${i / (TIER_KEYS.length - 1)}"></span>`).join('')}
+      <div class="tier-thumb"></div>
+      <input type="range" class="tier-slider" min="0" max="${TIER_KEYS.length - 1}" step="any" aria-label="Opening tier">
+    </div>
     <div class="tier-labels">
       ${TIER_KEYS.map((k, i) => `<button class="tier-label" data-i="${i}" style="--tier:${TIERS[k].color}">${esc(TIERS[k].name)}</button>`).join('')}
     </div>
@@ -53,6 +59,9 @@ export function render(root) {
   </div>`);
   root.appendChild(tierBox);
   const slider = tierBox.querySelector('.tier-slider');
+  const track = tierBox.querySelector('.tier-track');
+  const maxTier = TIER_KEYS.length - 1;
+  let dragging = false;
 
   const filters = h(`<div class="filters">
     <button class="btn small" data-f="all">All</button>
@@ -62,7 +71,7 @@ export function render(root) {
   const grid = h('<div class="grid"></div>');
   root.appendChild(grid);
 
-  function draw() {
+  function draw(animate = false) {
     levelBox.querySelectorAll('.level-chip').forEach((b) => b.classList.toggle('active', b.dataset.level === level));
     levelBox.querySelector('.level-blurb').textContent = LEVELS[level].blurb;
     const side = sideFilter === 'all' ? lastSide : sideFilter;
@@ -75,21 +84,26 @@ export function render(root) {
     toggle.querySelector('.side-icon').style.backgroundImage = `url(${pieceUrl(side, 'k')})`;
     toggle.querySelector('.side-name').textContent = side === 'w' ? 'As White' : 'As Black';
     const t = TIERS[tier], ti = TIER_KEYS.indexOf(tier);
-    slider.value = ti;
+    if (!dragging) { slider.value = ti; track.style.setProperty('--p', ti / maxTier); }
+    slider.setAttribute('aria-valuetext', t.name);
     tierBox.style.setProperty('--tier', t.color);
-    tierBox.style.setProperty('--tier-pos', `${(ti / (TIER_KEYS.length - 1)) * 100}%`);
     tierBox.querySelectorAll('.tier-label').forEach((b) => b.classList.toggle('active', +b.dataset.i === ti));
     tierBox.querySelector('.tier-blurb').textContent = t.blurb;
     grid.style.setProperty('--tier', t.color);
 
-    grid.innerHTML = '';
+    swapCards(animate);
+  }
+
+  /** The cards for the current tier and side. */
+  function cards() {
+    const out = [];
     const list = OPENINGS.filter((o) => o.tier === tier && (sideFilter === 'all' || o.side === sideFilter));
-    if (!list.length) grid.appendChild(h('<p class="muted">No openings for this side in this tier yet.</p>'));
+    if (!list.length) out.push(h('<p class="muted">No openings for this side in this tier yet.</p>'));
     for (const o of list) {
       const p = openingProgress(o);
       const due = dueCount(o);
       const n = linesFor(o, level).length;
-      grid.appendChild(h(`<article class="card opening-card">
+      out.push(h(`<article class="card opening-card">
         <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
           <h3>${esc(o.name)}</h3></div><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
         <div class="lvl-row">${levelBadges(o)}</div>
@@ -107,6 +121,27 @@ export function render(root) {
         </div>
       </article>`));
     }
+    return out;
+  }
+
+  // Old cards fade and sink away, then the new ones rise in one after another. A newer
+  // change while that runs wins (the stale run sees a different `gen` and stops).
+  let gen = 0;
+  async function swapCards(animate) {
+    const my = ++gen;
+    const old = [...grid.children];
+    if (animate && animationsOn() && old.length) {
+      await Promise.all(old.map((el, i) => el.animate(
+        [{ opacity: 0, transform: 'translateY(10px) scale(0.96)' }],
+        { duration: 160, delay: Math.min(i, 6) * 18, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {})));
+      if (my !== gen) return;
+    }
+    const fresh = cards();
+    grid.replaceChildren(...fresh);
+    if (!animate || !animationsOn()) return;
+    fresh.forEach((el, i) => el.animate(
+      [{ opacity: 0, transform: 'translateY(16px) scale(0.96)' }, { opacity: 1, transform: 'none' }],
+      { duration: 320, delay: i * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
   }
 
   levelBox.addEventListener('click', (e) => {
@@ -115,9 +150,37 @@ export function render(root) {
   });
   const pickTier = (i) => {
     const k = TIER_KEYS[i];
-    if (k && k !== tier) { tier = k; setSetting('tier', k); draw(); }
+    if (k && k !== tier) { tier = k; setSetting('tier', k); draw(true); }
   };
-  slider.addEventListener('input', () => pickTier(+slider.value));
+  // The range input is invisible on top of the track: dragging moves the thumb freely
+  // (switching tier as it passes the middle), releasing glides it to the nearest stop.
+  let downX = null;
+  slider.addEventListener('pointerdown', (e) => { downX = e.clientX; });
+  slider.addEventListener('pointermove', (e) => {
+    if (downX !== null && Math.abs(e.clientX - downX) > 3) { dragging = true; track.classList.add('dragging'); }
+  });
+  slider.addEventListener('input', () => {
+    if (dragging) track.style.setProperty('--p', slider.value / maxTier);
+    pickTier(Math.round(+slider.value));
+    if (!dragging) draw(); // a click on the track: glide to the stop
+  });
+  const release = () => {
+    downX = null;
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('dragging');
+    draw(); // snaps --p to the tier's stop, with the transition
+  };
+  slider.addEventListener('change', release);
+  slider.addEventListener('pointerup', release);
+  slider.addEventListener('pointercancel', release);
+  slider.addEventListener('keydown', (e) => {
+    const d = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? maxTier : d !== undefined ? TIER_KEYS.indexOf(tier) + d : null;
+    if (to === null) return;
+    e.preventDefault();
+    pickTier(Math.max(0, Math.min(maxTier, to)));
+  });
   tierBox.addEventListener('click', (e) => {
     const b = e.target.closest('.tier-label');
     if (b) pickTier(+b.dataset.i);
@@ -128,7 +191,7 @@ export function render(root) {
     if (b.dataset.f === 'all') sideFilter = 'all';
     // First click picks the side it shows; after that each click swaps White <-> Black.
     else sideFilter = lastSide = sideFilter === 'all' ? lastSide : (sideFilter === 'w' ? 'b' : 'w');
-    draw();
+    draw(true);
   });
   draw();
 }
