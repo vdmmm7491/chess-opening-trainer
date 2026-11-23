@@ -401,7 +401,10 @@ export function render(root, { query }) {
     const whose = new Chess(fenAt(ply)).turn() === review ? 'Your move' : "Opponent's move";
     const isBest = !!e && !e.best && cls !== 'theory'; // the played move was the engine's own choice
     const best = isBest ? played : e?.best || '';
-    const cost = e && e.loss >= 10 ? `costs about <b>${(e.loss / 100).toFixed(1)}</b> pawns` : 'is practically as good';
+    // Ratings use expected-score drops: in a won or lost position a pawn or so can still be a top move.
+    const cost = e && e.loss >= 10 && !['top', 'only', 'masterstroke'].includes(cls)
+      ? `costs about <b>${(e.loss / 100).toFixed(1)}</b> pawns`
+      : e && e.loss >= 50 ? `is a little less precise (about ${(e.loss / 100).toFixed(1)} pawns), but it doesn't change the expected result` : 'is practically as good';
     const verdict = isBest
       ? `<p><b>${esc(moveLabel(ply, played))}</b> was Stockfish's best move.</p>`
       : best
