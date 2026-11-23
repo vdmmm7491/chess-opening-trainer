@@ -52,7 +52,7 @@ export function render(root, { id, query }) {
           <button class="btn small" data-mode="learn">Learn</button>
           <button class="btn small" data-mode="practice">Practice</button>
           <a class="btn small quiz-link" href="#/quiz/${opening.id}">🧩 Quiz</a>
-          ${PUNISH[opening.id]?.length ? `<a class="btn small" href="#/punish/${opening.id}">⚔️ Punish</a>` : ''}
+          ${PUNISH[opening.id]?.length ? `<a class="btn small punish-link" href="#/punish/${opening.id}" title="Mistakes opponents make in this line">⚔️ Punish</a>` : ''}
         </div>
       </div>
       <div class="card status-card">
@@ -186,6 +186,8 @@ export function render(root, { id, query }) {
     if (!entry(idx)) idx = pickLine(opening, -1, level);
     lineIdx = idx;
     moves = entry(idx).moves;
+    const pl = $('.punish-link');
+    if (pl) pl.href = `#/punish/${opening.id}?line=${idx}`; // Punish opens on the line you're training
     chess = new Chess();
     mistakes = 0; tries = 0; phase = 'book'; busy = false;
     openLines(false);

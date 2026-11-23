@@ -1,13 +1,15 @@
 // "Punish" mode: common opponent mistakes in each opening and how to punish them.
 // Keyed by opening id. Each entry:
-//   name:    short label for the picker (keep it short: phones)
+//   name:    short label, shown only once it's solved (keep it short: phones)
 //   moves:   SAN from the start up to and including the opponent's mistake
 //   punish:  your punishing moves, with the opponent's likely replies in between;
 //            starts and ends with YOUR move
-//   mistake: shown before you move: what's wrong with their move (don't give the answer away)
+//   mistake: the first hint (or after a wrong try): what's wrong with their move (don't give the answer away)
 //   why:     shown once you've found it: why the punishment works
 //   elo:     the lowest rating band where this mistake is typical (a band's min from BANDS)
 //   upTo:    optional: the highest band it still shows up in (classic traps catch strong players too)
+// The page shows the mistakes for your training level (LEVEL_BANDS) and the line you pick
+// (linesOf: matched by move prefix, so no line field is needed).
 // Every line was checked with Stockfish. Check edits with tools/validate.html.
 
 /** Rating bands for Punish mode. Fixed, so entries never need re-sorting. */
@@ -22,15 +24,39 @@ export const BANDS = [
   { min: 2000, max: Infinity, label: '2000+' },
 ];
 
-/** The band (its min) for a rating number, e.g. 820 -> 750. */
-export function bandFor(rating) {
-  const r = Number(rating) || 0;
-  return [...BANDS].reverse().find((b) => r >= b.min).min;
-}
-
 /** Does this entry belong in the band that starts at `min`? */
 export function inBand(e, min) {
   return min >= e.elo && min <= (e.upTo ?? e.elo);
+}
+
+/** The rating bands each training level (LEVELS in openings.js) covers. */
+export const LEVEL_BANDS = {
+  beginner: [0, 500, 750],
+  amateur: [1000, 1250],
+  intermediate: [1500, 1750],
+  advanced: [2000],
+};
+
+/** Is this mistake typical for players at a training level? */
+export function forLevel(e, level) {
+  return (LEVEL_BANDS[level] || []).some((min) => inBand(e, min));
+}
+
+/**
+ * The lines of `opening` a mistake belongs to (indexes into opening.lines): the ones that
+ * share the most moves with the position before the mistake. A mistake on move 2 or 3
+ * that every line shares (a Scholar's mate try, say) belongs to all of them.
+ */
+export function linesOf(opening, e) {
+  const setup = e.moves.trim().split(/\s+/).slice(0, -1);
+  let best = 0, out = [];
+  opening.lines.forEach((line, i) => {
+    const mv = line.moves.trim().split(/\s+/);
+    let k = 0;
+    while (k < setup.length && mv[k] === setup[k]) k++;
+    if (k > best) { best = k; out = [i]; } else if (k === best) out.push(i);
+  });
+  return best >= 2 ? out : [];
 }
 
 export const PUNISH = {
