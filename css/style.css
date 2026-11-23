@@ -116,6 +116,23 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .filters .side-toggle.active.w { box-shadow: 0 0 0 2px var(--accent), 0 2px 10px var(--accent-shadow); }
 .filters .side-toggle.active.b { box-shadow: 0 0 0 2px var(--accent), 0 2px 10px var(--accent-shadow); }
 .filters .side-toggle:hover { opacity: 1; }
+/* Opening search: fills the rest of the filter row, wraps below on narrow screens */
+.search-box {
+  flex: 1 1 220px; display: flex; align-items: center; gap: 6px; min-width: 0;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); }
+.search-box .search-icon { font-size: 0.85rem; opacity: 0.6; }
+.opening-search { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 6px 0; font-size: 0.9rem; }
+.opening-search::placeholder { color: var(--muted); }
+/* While searching, results come from every tier, so the slider steps back */
+.tier-box.searching { opacity: 0.5; }
+.tier-tag {
+  font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  color: #fff; background: var(--tier);
+}
+.opening-card .line-hits { font-size: 0.82rem; color: var(--muted); margin: -4px 0 0; }
 .side-toggle .side-icon { width: 20px; height: 20px; background: center/contain no-repeat; }
 .side-toggle .side-swap { opacity: 0.55; font-size: 0.85em; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }

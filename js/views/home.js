@@ -4,9 +4,11 @@ import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
 import { animationsOn } from '../theme.js';
+import { matchOpening } from '../search.js';
 
 let sideFilter = 'all';
 let lastSide = 'w'; // the side the White/Black toggle shows while "All" is selected
+let query = ''; // opening search; while set, it searches every tier
 
 function levelBadges(o) {
   return (o.levels || []).map((k) => {
@@ -68,7 +70,13 @@ export function render(root) {
   const filters = h(`<div class="filters">
     <button class="btn small" data-f="all">All</button>
     <button class="btn small side-toggle" data-f="side" title="Click to switch between White and Black"><span class="side-icon"></span><span class="side-name"></span><span class="side-swap" aria-hidden="true">⇄</span></button>
+    <label class="search-box">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input type="search" class="opening-search" placeholder="Search openings, ECO or moves (e4 c5)" aria-label="Search openings" autocomplete="off" spellcheck="false">
+    </label>
   </div>`);
+  const search = filters.querySelector('.opening-search');
+  search.value = query;
   root.appendChild(filters);
   const grid = h('<div class="grid"></div>');
   root.appendChild(grid);
@@ -92,6 +100,7 @@ export function render(root) {
     tierBox.querySelectorAll('.tier-label').forEach((b) => b.classList.toggle('active', +b.dataset.i === ti));
     tierBox.querySelector('.tier-blurb').textContent = t.blurb;
     grid.style.setProperty('--tier', t.color);
+    tierBox.classList.toggle('searching', !!query.trim());
 
     swapCards(animate);
   }
@@ -99,17 +108,33 @@ export function render(root) {
   /** The cards for the current tier and side. */
   function cards() {
     const out = [];
-    const list = OPENINGS.filter((o) => o.tier === tier && (sideFilter === 'all' || o.side === sideFilter));
-    if (!list.length) out.push(h('<p class="muted">No openings for this side in this tier yet.</p>'));
+    const searching = !!query.trim();
+    const found = new Map();
+    const list = OPENINGS.filter((o) => {
+      if (sideFilter !== 'all' && o.side !== sideFilter) return false;
+      if (!searching) return o.tier === tier;
+      const m = matchOpening(o, query);
+      if (m) found.set(o.id, m);
+      return !!m;
+    });
+    if (!list.length) {
+      out.push(h(searching
+        ? `<p class="muted">No openings match “${esc(query.trim())}”${sideFilter === 'all' ? '' : ' for this side'}.</p>`
+        : '<p class="muted">No openings for this side in this tier yet.</p>'));
+    }
     for (const o of list) {
+      const m = found.get(o.id);
+      const tierTag = searching && TIERS[o.tier] ? `<span class="tier-tag" style="--tier:${TIERS[o.tier].color}">${esc(TIERS[o.tier].name)}</span>` : '';
+      const lineHits = m?.lines.length ? `<p class="line-hits">Lines: ${m.lines.slice(0, 4).map(esc).join(' · ')}${m.lines.length > 4 ? ` +${m.lines.length - 4} more` : ''}</p>` : '';
       const p = openingProgress(o);
       const due = dueCount(o);
       const n = linesFor(o, level).length;
-      out.push(h(`<article class="card opening-card">
+      out.push(h(`<article class="card opening-card" style="--tier:${TIERS[o.tier]?.color || 'var(--border)'}">
         <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
           <h3>${esc(o.name)}</h3></div><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
-        <div class="lvl-row">${levelBadges(o)}</div>
+        <div class="lvl-row">${tierTag}${levelBadges(o)}</div>
         <p>${esc(o.description)}</p>
+        ${lineHits}
         ${o.levelNote ? `<p class="level-note">🎯 ${esc(o.levelNote)}</p>` : ''}
         <div class="kv"><span class="muted">${n} line${n === 1 ? '' : 's'} · up to move ${depthAt(o, level)} · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by opening books and databases" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span></div>
         ${progressBar(p)}
@@ -187,6 +212,14 @@ export function render(root) {
     const b = e.target.closest('.tier-label');
     if (b) pickTier(+b.dataset.i);
   });
+  let searchTimer;
+  search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { query = search.value; draw(); }, 120);
+  });
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && search.value) { e.stopPropagation(); search.value = query = ''; draw(); }
+  });
   filters.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -196,4 +229,5 @@ export function render(root) {
     draw(true);
   });
   draw();
+  return () => clearTimeout(searchTimer);
 }
