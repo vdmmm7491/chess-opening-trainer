@@ -62,7 +62,8 @@ export class Engine {
   start(job) {
     this.current = job;
     this.searching = true;
-    this.ready.then(() => { if (this.current === job) this.sendJob(job); });
+    // Send whatever job is current by then: a newer request may have replaced this one.
+    this.ready.then(() => { if (this.current && !this.current.sent) this.sendJob(this.current); });
   }
 
   sendJob(job) {
