@@ -140,6 +140,28 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
   border: 1px solid color-mix(in srgb, var(--lvl) 45%, transparent);
 }
 .opening-card .level-note { font-size: 0.85rem; color: var(--text); opacity: 0.85; }
+/* Opening tier slider (colours deliberately differ from the line levels) */
+.tier-box { --tier: var(--accent); --tier-pos: 0%; margin-bottom: 14px; border-top: 4px solid var(--tier); transition: border-color 0.25s; }
+.tier-head { margin-bottom: 12px; }
+.tier-slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 10px; margin: 6px 0 4px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, var(--tier) var(--tier-pos), var(--panel-2) var(--tier-pos));
+}
+.tier-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--tier); border: 3px solid var(--panel); box-shadow: 0 0 0 2px var(--tier); transition: background 0.25s, box-shadow 0.25s;
+}
+.tier-slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%; background: var(--tier); border: 3px solid var(--panel); box-shadow: 0 0 0 2px var(--tier);
+}
+.tier-labels { display: flex; justify-content: space-between; gap: 8px; }
+.tier-label {
+  background: none; border: 0; padding: 4px 0; cursor: pointer; font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--muted);
+}
+.tier-label.active { color: var(--tier); }
+.tier-blurb { margin: 8px 0 0; font-size: 0.88rem; }
+.grid .opening-card { border-top: 3px solid var(--tier, var(--border)); }
+.grid .opening-card:hover { border-color: var(--tier, var(--accent)); }
 @media (max-width: 760px) {
   .level-chips { grid-template-columns: repeat(2, 1fr); }
 }

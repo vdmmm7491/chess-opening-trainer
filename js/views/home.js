@@ -1,5 +1,5 @@
-import { OPENINGS, LEVELS, linesFor } from '../openings.js';
-import { openingProgress, dueCount, summary, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { OPENINGS, LEVELS, TIERS, TIER_KEYS, tierForLevel, linesFor } from '../openings.js';
+import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
 import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -41,6 +41,18 @@ export function render(root) {
   </div>`);
   root.appendChild(levelBox);
 
+  let tier = TIERS[getSettings().tier] ? getSettings().tier : tierForLevel(level);
+  const tierBox = h(`<div class="card tier-box">
+    <div class="tier-head"><b>Openings</b> <span class="muted">Slide to pick how hard the openings are.</span></div>
+    <input type="range" class="tier-slider" min="0" max="${TIER_KEYS.length - 1}" step="1" aria-label="Opening tier">
+    <div class="tier-labels">
+      ${TIER_KEYS.map((k, i) => `<button class="tier-label" data-i="${i}" style="--tier:${TIERS[k].color}">${esc(TIERS[k].name)}</button>`).join('')}
+    </div>
+    <p class="muted tier-blurb"></p>
+  </div>`);
+  root.appendChild(tierBox);
+  const slider = tierBox.querySelector('.tier-slider');
+
   const filters = h(`<div class="filters">
     <button class="btn small" data-f="all">All</button>
     <button class="btn small" data-f="w">As White</button>
@@ -54,9 +66,17 @@ export function render(root) {
     levelBox.querySelectorAll('.level-chip').forEach((b) => b.classList.toggle('active', b.dataset.level === level));
     levelBox.querySelector('.level-blurb').textContent = LEVELS[level].blurb;
     filters.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.f === sideFilter));
+    const t = TIERS[tier], ti = TIER_KEYS.indexOf(tier);
+    slider.value = ti;
+    tierBox.style.setProperty('--tier', t.color);
+    tierBox.style.setProperty('--tier-pos', `${(ti / (TIER_KEYS.length - 1)) * 100}%`);
+    tierBox.querySelectorAll('.tier-label').forEach((b) => b.classList.toggle('active', +b.dataset.i === ti));
+    tierBox.querySelector('.tier-blurb').textContent = t.blurb;
+    grid.style.setProperty('--tier', t.color);
 
     grid.innerHTML = '';
-    const list = OPENINGS.filter((o) => sideFilter === 'all' || o.side === sideFilter);
+    const list = OPENINGS.filter((o) => o.tier === tier && (sideFilter === 'all' || o.side === sideFilter));
+    if (!list.length) grid.appendChild(h('<p class="muted">No openings for this side in this tier yet.</p>'));
     for (const o of list) {
       const p = openingProgress(o);
       const due = dueCount(o);
@@ -84,6 +104,15 @@ export function render(root) {
   levelBox.addEventListener('click', (e) => {
     const b = e.target.closest('.level-chip');
     if (b) { level = b.dataset.level; setLevel(level); draw(); }
+  });
+  const pickTier = (i) => {
+    const k = TIER_KEYS[i];
+    if (k && k !== tier) { tier = k; setSetting('tier', k); draw(); }
+  };
+  slider.addEventListener('input', () => pickTier(+slider.value));
+  tierBox.addEventListener('click', (e) => {
+    const b = e.target.closest('.tier-label');
+    if (b) pickTier(+b.dataset.i);
   });
   filters.addEventListener('click', (e) => {
     const b = e.target.closest('button');

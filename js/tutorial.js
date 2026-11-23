@@ -22,6 +22,8 @@ const STEPS = [
     text: 'This short tour opens every part of the site and shows you what it does. Use <b>Next</b> and <b>Back</b>, or the arrow keys. Press <b>Esc</b> to stop.' },
   { route: '#/', target: '.level-box', title: 'Pick your level',
     text: 'Choose your level: Beginner, Amateur, Intermediate or Advanced. It sets how deep every line goes, from the first 6 moves up to the full master lines, and which sidelines you learn.' },
+  { route: '#/', target: '.tier-box', title: 'How hard are the openings?',
+    text: 'Slide between <b>First Openings</b>, <b>Next Steps</b> and <b>Master Class</b> to see the openings at that difficulty. Start with First Openings and move on when they feel easy.' },
   { route: '#/', target: '.filters', title: 'White or Black',
     text: 'Show only the openings you play as White, as Black, or all of them.' },
   { route: '#/', target: '.opening-card', title: 'An opening card',

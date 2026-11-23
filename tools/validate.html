@@ -21,7 +21,7 @@
   <div id="out">Checking…</div>
   <script type="module">
     import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.0.0/+esm';
-    import { OPENINGS, LEVELS, LEVEL_KEYS, linesFor, cutMoves } from '../js/openings.js';
+    import { OPENINGS, LEVELS, LEVEL_KEYS, TIERS, linesFor, cutMoves } from '../js/openings.js';
     import { DEEP_NOTES } from '../js/line-notes-deep.js';
     import { NOTES } from '../js/notes.js';
     import { LINE_NOTES } from '../js/line-notes.js';
@@ -43,6 +43,7 @@
       if (o.side !== 'w' && o.side !== 'b') errors.push(`${where}: <code>side</code> must be 'w' or 'b'`);
       if (!Array.isArray(o.levels) || !o.levels.length) errors.push(`${where}: add <code>levels</code>, e.g. ['beginner', 'intermediate']`);
       else for (const l of o.levels) if (!LEVELS[l]) errors.push(`${where}: unknown level <code>${l}</code> (use ${Object.keys(LEVELS).join(', ')})`);
+      if (!TIERS[o.tier]) errors.push(`${where}: <code>tier</code> must be one of ${Object.keys(TIERS).join(', ')}`);
       if (!o.levelNote) warnings.push(`${where}: no <code>levelNote</code> explaining who it suits`);
       if (!o.lines?.length) { errors.push(`${where}: has no lines`); continue; }
       const seen = new Set();

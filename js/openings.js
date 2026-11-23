@@ -1,5 +1,6 @@
 // Opening repertoire data.
 // side:      the colour YOU play when training this opening ('w' or 'b').
+// tier:      which TIERS group the opening is listed under on the home page.
 // levels:    which LEVELS the opening suits (shown as badges on the card).
 // levelNote: one sentence on why it suits those players (shown on the card).
 // Each line is a space-separated list of SAN moves starting from the initial position: the
@@ -22,6 +23,22 @@ export const LEVELS = {
   advanced: { name: 'Advanced', range: '2000+', upTo: Infinity, blurb: 'The full main lines, as deep as master games go (up to move 20+).', color: '#ef5350' },
 };
 export const LEVEL_KEYS = Object.keys(LEVELS);
+
+/**
+ * Opening tiers, easiest first: how hard the OPENING is to learn (the home page slider).
+ * Separate from LEVELS, which set how deep each line goes. Colours differ from LEVELS on purpose.
+ */
+export const TIERS = {
+  first: { name: 'First Openings', blurb: 'Simple plans and clear principles. Start here.', color: '#14a3b8' },
+  next: { name: 'Next Steps', blurb: 'Richer structures and more theory, once the basics feel easy.', color: '#8b5cf6' },
+  master: { name: 'Master Class', blurb: 'Sharp or deeply positional openings with heavy theory.', color: '#d6336c' },
+};
+export const TIER_KEYS = Object.keys(TIERS);
+
+/** The tier the home page starts on for a training level. */
+export function tierForLevel(level) {
+  return level === 'beginner' ? 'first' : level === 'amateur' ? 'next' : 'master';
+}
 
 /**
  * Rough level for a Chess.com rating, used only to tailor suggestions from your own games.
@@ -61,6 +78,7 @@ export const OPENINGS = [
   {
     id: 'italian', name: 'Italian Game', eco: 'C50–C54', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Italian_Game',
+    tier: 'first',
     levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Teaches the basics (fast development, castling, centre control) and stays playable all the way up.',
     description: 'Develop fast, aim the bishop at f7 and build a slow, solid centre with c3 and d3/d4.',
@@ -77,6 +95,7 @@ export const OPENINGS = [
   {
     id: 'ruy-lopez', name: 'Ruy López', eco: 'C60–C99', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Ruy_Lopez',
+    tier: 'next',
     levels: ['amateur', 'intermediate', 'advanced'],
     levelNote: 'Deep theory and slow manoeuvring plans pay off once you understand pawn structures.',
     description: 'The Spanish: pressure the e5 defender with Bb5 and play for a long-term central advantage.',
@@ -94,6 +113,7 @@ export const OPENINGS = [
   {
     id: 'scotch', name: 'Scotch Game', eco: 'C44–C45', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Scotch_Game',
+    tier: 'first',
     levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Open, direct positions with clear plans and little theory to memorise.',
     description: 'Open the centre immediately with d4 for active, direct piece play.',
@@ -108,6 +128,7 @@ export const OPENINGS = [
   {
     id: 'queens-gambit', name: "Queen's Gambit", eco: 'D06–D69', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Queen%27s_Gambit',
+    tier: 'next',
     levels: ['amateur', 'intermediate', 'advanced'],
     levelNote: 'Positional and principled. Best once you are comfortable with slower, strategic games.',
     description: 'Offer the c-pawn to deflect Black from the centre. Positional, principled, timeless.',
@@ -125,6 +146,7 @@ export const OPENINGS = [
   {
     id: 'london', name: 'London System', eco: 'D02 / A48', side: 'w',
     source: 'https://en.wikipedia.org/wiki/London_System',
+    tier: 'first',
     levels: ['beginner', 'amateur'],
     levelNote: 'The same setup against almost everything, so there is very little to memorise.',
     description: 'A reliable setup: d4, Bf4, e3, Nf3, c3 and Bd3 against almost anything.',
@@ -141,6 +163,7 @@ export const OPENINGS = [
   {
     id: 'english', name: 'English Opening', eco: 'A10–A39', side: 'w',
     source: 'https://en.wikipedia.org/wiki/English_Opening',
+    tier: 'master',
     levels: ['intermediate', 'advanced'],
     levelNote: 'Flexible and transpositional. You need a feel for structures more than memorised lines.',
     description: 'Flexible flank opening – control d5 with c4, fianchetto and play a reversed Sicilian.',
@@ -157,6 +180,7 @@ export const OPENINGS = [
   {
     id: 'vienna', name: 'Vienna Game', eco: 'C25–C29', side: 'w',
     source: 'https://en.wikipedia.org/wiki/Vienna_Game',
+    tier: 'first',
     levels: ['beginner', 'amateur'],
     levelNote: 'Aggressive, full of traps, and opponents at club level often go wrong early.',
     description: 'Nc3 first, then an early f4 – an aggressive weapon against 1...e5.',
@@ -173,6 +197,7 @@ export const OPENINGS = [
   {
     id: 'alien-gambit', name: 'Alien Gambit', eco: 'B15', side: 'w',
     source: 'https://ramachess.com/articles/alien-gambit/',
+    tier: 'first',
     levels: ['beginner', 'amateur'],
     levelNote: 'Full of traps and great in fast games below club level. Objectively unsound: Stockfish gives Black about −1.8 with correct defence.',
     description: 'Witty Alien\'s 2023 gambit against the Caro-Kann: after 4...Nf6, play 5.Ng5 and sacrifice the knight on f7 to drag Black\'s king out.',
@@ -191,6 +216,7 @@ export const OPENINGS = [
   {
     id: 'sicilian-najdorf', name: 'Sicilian Najdorf', eco: 'B90–B99', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Sicilian_Defence,_Najdorf_Variation',
+    tier: 'master',
     levels: ['intermediate', 'advanced'],
     levelNote: 'Very sharp with huge amounts of theory. One wrong move can lose on the spot.',
     description: 'The sharpest answer to 1.e4. ...a6 keeps options open for ...e5 or ...e6 and queenside play.',
@@ -211,6 +237,7 @@ export const OPENINGS = [
   {
     id: 'french', name: 'French Defence', eco: 'C00–C19', side: 'b',
     source: 'https://en.wikipedia.org/wiki/French_Defence',
+    tier: 'next',
     levels: ['amateur', 'intermediate'],
     levelNote: 'Solid, with clear pawn-break plans (...c5, ...f6), but the light-squared bishop needs care.',
     description: 'Solid and counter-attacking: ...e6 and ...d5, then strike back with ...c5 and ...f6.',
@@ -229,6 +256,7 @@ export const OPENINGS = [
   {
     id: 'caro-kann', name: 'Caro-Kann Defence', eco: 'B10–B19', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Caro%E2%80%93Kann_Defence',
+    tier: 'first',
     levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'Safe and sound with few early traps. A reliable defence at every level.',
     description: 'Rock-solid: ...c6 and ...d5 with a healthy pawn structure and the light bishop outside the chain.',
@@ -247,6 +275,7 @@ export const OPENINGS = [
   {
     id: 'scandinavian', name: 'Scandinavian Defence', eco: 'B01', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Scandinavian_Defense',
+    tier: 'first',
     levels: ['beginner', 'amateur'],
     levelNote: 'Forces the game onto your terms from move one, with simple development plans.',
     description: 'Challenge e4 immediately with ...d5. Simple plans and easy development.',
@@ -262,6 +291,7 @@ export const OPENINGS = [
   {
     id: 'open-game-black', name: '1...e5 Open Games', eco: 'C40–C59', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Open_Game',
+    tier: 'first',
     levels: ['beginner', 'amateur', 'intermediate'],
     levelNote: 'The classical answer to 1.e4. It teaches open-game principles you will use forever.',
     description: 'Meet 1.e4 with the classical 1...e5 – correct answers to the Italian, Scotch and friends.',
@@ -281,6 +311,7 @@ export const OPENINGS = [
   {
     id: 'kings-indian', name: "King's Indian Defence", eco: 'E60–E99', side: 'b',
     source: 'https://en.wikipedia.org/wiki/King%27s_Indian_Defence',
+    tier: 'master',
     levels: ['intermediate', 'advanced'],
     levelNote: 'You give White the centre on purpose, so you must know exactly when and how to strike back.',
     description: 'Let White take the centre, then hit back with ...e5 and a kingside pawn storm.',
@@ -298,6 +329,7 @@ export const OPENINGS = [
   {
     id: 'nimzo', name: 'Nimzo-Indian Defence', eco: 'E20–E59', side: 'b',
     source: 'https://en.wikipedia.org/wiki/Nimzo-Indian_Defence',
+    tier: 'master',
     levels: ['intermediate', 'advanced'],
     levelNote: 'Subtle positional ideas: bishop pair vs. structure and control of e4.',
     description: 'Pin the c3-knight with ...Bb4 and fight for e4 with pieces rather than pawns.',
