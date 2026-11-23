@@ -22,6 +22,6 @@
 
 ## Known limitations
 - Progress is stored per browser. Use Export/Import to move it between devices.
-- Stockfish 10 (asm.js) is weaker than modern NNUE builds and can misjudge offbeat but sound opening moves at low depth.
-  The Chess.com engine check skips each side's first 3 moves and uses fairly high loss thresholds for that reason.
+- The browser engine (Stockfish 19 lite, single-threaded) searches to modest depths, so the Chess.com engine check still
+  treats each side's first 3 moves leniently and uses fairly high loss thresholds.
 - The Chess.com deviation finder compares your games against the trainer's built-in repertoire, not your personal repertoire (yet).

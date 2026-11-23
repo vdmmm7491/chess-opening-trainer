@@ -157,7 +157,8 @@ export function makeAnalyser(engine, bar, lineEl, board) {
           if (my !== token) return;
           bar.set(info);
           if (lineEl) lineEl.textContent = `${formatEval(info)}  d${info.depth}  ${pvToSan(fen, info.pv, 8)}`;
-          if (board && showArrow && info.pv[0]) {
+          // Shallow iterations jump between moves; only draw the arrow once the search has settled a bit.
+          if (board && showArrow && info.pv[0] && info.depth >= Math.min(10, depth)) {
             board.setArrows([{ from: info.pv[0].slice(0, 2), to: info.pv[0].slice(2, 4), color: 'blue' }]);
           }
         },

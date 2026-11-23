@@ -233,7 +233,7 @@ export async function engineCheck(engine, game, { maxPly = Infinity, depth = 12,
     // In the first 3 moves each, a shallow browser engine judges offbeat but sound choices
     // (1.b3, 1...g6) too harshly: only real mistakes count there.
     if (ply < 6 && kind === 'dubious') kind = 'solid';
-    if (!isBest && kind !== 'top') {
+    if (!isBest) { // the engine's move, also for near-equal 'top' moves (the review shows it for every move)
       try { entry.best = new Chess(fen).move({ from: e.bestmove.slice(0, 2), to: e.bestmove.slice(2, 4), promotion: e.bestmove[4] }).san; } catch { /* */ }
     }
     out.push({ ...entry, kind, loss: Math.max(0, bestScore - playedScore), drop: drop(bestScore, playedScore) });
@@ -307,7 +307,7 @@ export function moveLabel(ply, san) {
  * this browser (localStorage) so a game is analysed only once. `full` = the whole game, both sides
  * (the analysis board's review); otherwise only your moves in the first CHECK_PLIES (the bulk check).
  */
-const REVIEW_KEY = 'opening-trainer.reviews.v2', MAX_REVIEWS = 40;
+const REVIEW_KEY = 'opening-trainer.reviews.v3', MAX_REVIEWS = 40;
 const reviews = (() => { try { return new Map(JSON.parse(localStorage.getItem(REVIEW_KEY) || '[]')); } catch { return new Map(); } })();
 
 /** @returns {{moves:Array, full:boolean}|null} */

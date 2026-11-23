@@ -147,7 +147,7 @@ js/engine.js        Stockfish wrapper
 js/coach.js         move explanations (notes in js/line-notes*.js and js/notes*.js)
 js/progress.js      saved progress and spaced repetition
 js/views/           one file per page
-engine/stockfish.js Stockfish 10, runs in your browser
+engine/             Stockfish 19 (WebAssembly) + Stockfish 10 (asm.js fallback), run in your browser
 tools/              local server and validator
 ```
 
@@ -159,8 +159,10 @@ tools/              local server and validator
 
 This project is licensed under **GPL-3.0** (see `LICENSE`) because it ships Stockfish.
 
-- **Engine**: [Stockfish](https://stockfishchess.org) 10 by T. Romstad, M. Costalba, J. Kiiski, G. Linscott and contributors (GPL-3.0),
-  compiled to JavaScript by Niklas Fiekas ([stockfish.js](https://github.com/niklasf/stockfish.js), the source for `engine/stockfish.js`).
+- **Engine**: [Stockfish](https://stockfishchess.org) by T. Romstad, M. Costalba, J. Kiiski, G. Linscott and contributors (GPL-3.0).
+  Stockfish 19 lite, single-threaded WebAssembly build by Nathan Rugg and Chess.com ([stockfish.js](https://github.com/nmrugg/stockfish.js), npm `stockfish` 19.0.1,
+  the source for `engine/stockfish-19-lite-single.js` and `.wasm`). Fallback for browsers without WebAssembly: Stockfish 10 compiled to
+  JavaScript by Niklas Fiekas ([stockfish.js](https://github.com/niklasf/stockfish.js), the source for `engine/stockfish.js`).
 - **Move logic**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa (BSD-2-Clause), loaded from jsDelivr.
 - **Piece sets** (shipped in `assets/pieces/`, copied from [lichess](https://github.com/lichess-org/lila/blob/master/COPYING.md); details in `assets/pieces/LICENSE.md`):
   - cburnett (the default, "Classic") by Colin M.L. Burnett and Merida by Armando Hernandez Marroquin: GPLv2+

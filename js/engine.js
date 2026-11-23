@@ -1,7 +1,12 @@
 // Thin wrapper around Stockfish (UCI) running in a Web Worker.
 // Only one search runs at a time; a new request stops the current one.
 
-const ENGINE_URL = new URL('../engine/stockfish.js', import.meta.url).href;
+// Stockfish 19 lite (NNUE), single-threaded WebAssembly: needs no SharedArrayBuffer, so it works on
+// GitHub Pages without COOP/COEP headers. The old asm.js Stockfish 10 build is the fallback for
+// browsers without WebAssembly.
+const WASM_URL = new URL('../engine/stockfish-19-lite-single.js', import.meta.url).href;
+const ASM_URL = new URL('../engine/stockfish.js', import.meta.url).href;
+const ENGINE_URL = typeof WebAssembly === 'object' ? WASM_URL : ASM_URL;
 
 export class Engine {
   constructor() {
@@ -21,7 +26,7 @@ export class Engine {
       this.handle(line);
     };
     this.send('uci');
-    this.send('setoption name Hash value 32');
+    this.send('setoption name Hash value 64');
     this.send('isready');
   }
 
@@ -36,8 +41,12 @@ export class Engine {
    */
   analyse(fen, opts = {}) {
     return new Promise((resolve) => {
-      const job = { fen, opts, resolve, info: null, lines: [], turn: fen.split(' ')[1] };
-      if (this.searching) {
+      const job = { fen, opts, resolve, info: null, lines: [], turn: fen.split(' ')[1], sent: false };
+      if (this.current && !this.current.sent) {
+        // Still waiting for the engine to load: nothing was sent yet, so just swap the job.
+        this.current.resolve({ bestmove: null, info: null, cancelled: true });
+        this.current = job;
+      } else if (this.searching) {
         if (this.queue) this.queue.resolve({ bestmove: null, info: null, cancelled: true });
         this.queue = job;
         this.send('stop');
@@ -47,10 +56,17 @@ export class Engine {
     });
   }
 
-  async start(job) {
-    await this.ready;
+  // Marks the engine busy right away (not only once it has loaded), so two searches can never run
+  // into each other: before, a second request during start-up started a parallel search and the
+  // two got each other's results.
+  start(job) {
     this.current = job;
     this.searching = true;
+    this.ready.then(() => { if (this.current === job) this.sendJob(job); });
+  }
+
+  sendJob(job) {
+    job.sent = true;
     const { depth, movetime, searchmoves, multipv = 1 } = job.opts;
     if (multipv !== this.multipv) { this.send('setoption name MultiPV value ' + multipv); this.multipv = multipv; }
     this.send('position fen ' + job.fen);
@@ -61,12 +77,16 @@ export class Engine {
 
   stop() {
     if (this.queue) { this.queue.resolve({ bestmove: null, info: null, cancelled: true }); this.queue = null; }
-    if (this.searching) this.send('stop');
+    if (this.current && !this.current.sent) {
+      this.current.resolve({ bestmove: null, info: null, cancelled: true });
+      this.current = null;
+      this.searching = false;
+    } else if (this.searching) this.send('stop');
   }
 
   handle(line) {
     const job = this.current;
-    if (!job) return;
+    if (!job || !job.sent) return;
     if (line.startsWith('info') && line.includes(' pv ') && !this.queue) {
       const info = parseInfo(line, job.turn);
       if (info) {

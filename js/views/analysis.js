@@ -25,6 +25,8 @@ export function render(root, { query }) {
   // Game review (opened from the Review tab): ?review=w|b&moves=…[&url=…&vs=…&ply=N&dev=N&book=SAN,SAN]
   const review = query.review === 'w' || query.review === 'b' ? query.review : null;
   let reviewBusy = false; // the review owns the engine; the live analyser waits
+  let reviewMoves = null; // engineCheck() result once the review is ready: the panel then follows the move on the board
+  let holdArrow = false; // a review button drew its own arrow: don't let the live analyser replace it
   let reviewToken = 0, animToken = 0, alive = true;
   // Move ratings (ply -> class key) from the review or the "Rate moves" button. They apply while the
   // moves still match the ones that were rated.
@@ -115,14 +117,14 @@ export function render(root, { query }) {
     const cur = cursor > 0 ? classOf(cursor - 1) : null;
     board.setBadge(cur && lastMoveOf(chess)?.to, cur && badgeHtml(cur));
     const badges = sans.map((_, i) => badgeHtml(classOf(i)));
-    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; rebuild(); sync(); }, cursor - 1, badges);
+    renderMoveList($('.movelist'), sans, (i) => { cursor = i + 1; navigated(); }, cursor - 1, badges);
     $('.key-wrap').hidden = !badges.some(Boolean);
     bar.setOrientation(board.orientation);
     bar.setVisible(getSettings().evalBar !== false);
-    const showArrow = $('.arrow').checked && !enginePlays;
+    const showArrow = $('.arrow').checked && !enginePlays && !holdArrow;
     board.setArrows([]);
     animToken++;
-    if (!reviewBusy) analyser.run(chess.fen(), { depth: 18, showArrow });
+    if (!reviewBusy) analyser.run(chess.fen(), { depth: 20, showArrow });
     const bookEl = $('.book');
     if (startFen === START && cursor > 0) {
       const b = findBook(sans.slice(0, cursor));
@@ -156,10 +158,10 @@ export function render(root, { query }) {
       return;
     }
     switch (b.dataset.act) {
-      case 'first': cursor = 0; break;
-      case 'back': cursor = Math.max(0, cursor - 1); break;
-      case 'fwd': cursor = Math.min(sans.length, cursor + 1); break;
-      case 'last': cursor = sans.length; break;
+      case 'first': cursor = 0; navigated(); return;
+      case 'back': cursor = Math.max(0, cursor - 1); navigated(); return;
+      case 'fwd': cursor = Math.min(sans.length, cursor + 1); navigated(); return;
+      case 'last': cursor = sans.length; navigated(); return;
       case 'flip': board.flip(); break;
       case 'reset': startFen = START; sans = []; cursor = 0; classes = []; break;
       case 'rate': rateMoves(); return;
@@ -184,8 +186,8 @@ export function render(root, { query }) {
 
   const onKey = (e) => {
     if (e.target.tagName === 'INPUT') return;
-    if (e.key === 'ArrowLeft') { cursor = Math.max(0, cursor - 1); rebuild(); sync(); }
-    if (e.key === 'ArrowRight') { cursor = Math.min(sans.length, cursor + 1); rebuild(); sync(); }
+    if (e.key === 'ArrowLeft') { cursor = Math.max(0, cursor - 1); navigated(); }
+    if (e.key === 'ArrowRight') { cursor = Math.min(sans.length, cursor + 1); navigated(); }
   };
   window.addEventListener('keydown', onKey);
 
@@ -217,7 +219,7 @@ export function render(root, { query }) {
 
   async function startReview() {
     const el = $('.review');
-    const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+    const title = titleHtml();
     const saved = getReview(query.url);
     let errs = saved?.full ? saved.moves : null;
     if (!errs) {
@@ -242,6 +244,7 @@ export function render(root, { query }) {
       }
     }
     setRatings(errs, gameSans);
+    reviewMoves = errs;
     items = mistakesOf(errs).map((e) => ({ ...e, bookSans: e.best ? [e.best] : null }));
     const dev = query.dev !== undefined ? Number(query.dev) : null;
     if (dev !== null && sans[dev] && !items.some((e) => e.ply === dev)) {
@@ -263,6 +266,7 @@ export function render(root, { query }) {
 
   async function explain(item) {
     const my = ++reviewToken;
+    holdArrow = false;
     const el = $('.review');
     const ply = item.ply, played = sans[ply];
     const fenBefore = fenAt(ply);
@@ -276,7 +280,7 @@ export function render(root, { query }) {
     if (['masterstroke', 'only', 'top'].includes(item.cls || classes[ply])) better = [played];
     try {
       if (!better) {
-        const r = await engine.analyse(fenBefore, { depth: 12 });
+        const r = await engine.analyse(fenBefore, { depth: 16 });
         if (!r.cancelled && r.bestmove) better = [uciToSan(fenBefore, r.bestmove)];
       }
       if (better && !better.includes(played)) res = await analyseMistake(engine, fenBefore, played, better);
@@ -284,14 +288,10 @@ export function render(root, { query }) {
     if (!alive || my !== reviewToken) return;
     reviewBusy = false;
 
-    const n = Math.min(items.length, 6);
-    const chips = items.length && (items.length > 1 || !items.includes(item))
-      ? `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
-          <div class="btn-row" style="margin-top:4px">${items.slice(0, n).map((e, i) => `<button class="btn small${e === item ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}</button>`).join('')}</div></div>`
-      : '';
+    const chips = items.length > 1 || !items.includes(item) ? chipsHtml(item.ply) : '';
     const link = query.url && /^https:\/\/(www\.)?chess\.com\//.test(query.url)
       ? `<a class="btn small" href="${esc(query.url)}" target="_blank" rel="noopener">Open on Chess.com ↗</a>` : '';
-    const title = `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+    const title = titleHtml();
 
     if (!res) {
       const cls = item.cls || classes[ply], c = CLASSES[cls];
@@ -346,16 +346,83 @@ export function render(root, { query }) {
       if (st) { showStep(res, Number(st.dataset.i)); return; }
       const b = e.target.closest('[data-rv]');
       if (!b) return;
-      if (b.dataset.rv === 'mine') { cursor = ply + 1; rebuild(); sync(); }
-      if (b.dataset.rv === 'better') {
-        cursor = ply; rebuild(); sync();
-        const m = new Chess(fenBefore).move(best);
-        board.setArrows([{ from: m.from, to: m.to, color: 'green' }]);
-      }
+      if (b.dataset.rv === 'mine') { holdArrow = false; cursor = ply + 1; rebuild(); sync(); }
+      if (b.dataset.rv === 'better') showBest(ply, best);
       if (b.dataset.rv === 'replay') replay(res);
     };
     sync();
     if (!playable && res.steps.length) replay(res);
+  }
+
+  const titleHtml = () => `<h2 style="margin:0 0 6px">Game review${query.vs ? ` vs ${esc(query.vs)}` : ''}</h2>`;
+  const chipsHtml = (cur) => !items.length ? '' : `<div style="margin-top:10px"><span class="muted" style="font-size:.85rem">Moves to look at:</span>
+      <div class="btn-row" style="margin-top:4px">${items.slice(0, 6).map((e, i) => `<button class="btn small${e.ply === cur ? ' primary' : ''}" data-rv="item" data-i="${i}">${esc(moveLabel(e.ply, e.san))}${badgeHtml(e.kind)}</button>`).join('')}</div></div>`;
+
+  // The user stepped to another move (◀ ▶, arrow keys, move list). Once the review is ready the panel
+  // follows the board: it rates the move just played and names the engine's best move in its place.
+  function navigated() {
+    holdArrow = false;
+    rebuild();
+    if (reviewMoves && review) {
+      reviewToken++; animToken++; // drop a detailed explanation that is still being worked out
+      reviewBusy = false;
+      sync();
+      showMove(cursor - 1);
+    } else sync();
+  }
+
+  // Go to the position before move `ply` and point at the best move (green arrow). Without a known
+  // best move the live engine draws its own arrow there.
+  function showBest(ply, bestSan) {
+    cursor = ply; rebuild();
+    holdArrow = !!bestSan;
+    sync();
+    if (!bestSan) return;
+    try {
+      const m = new Chess(fenAt(ply)).move(bestSan);
+      board.setArrows([{ from: m.from, to: m.to, color: 'green' }]);
+    } catch { /* not legal here */ }
+  }
+
+  function showMove(ply) {
+    const el = $('.review');
+    el.onclick = null;
+    if (ply < 0) {
+      el.innerHTML = `${titleHtml()}<p class="muted" style="margin:0">Start of the game. Step through with ◀ ▶: every move shows its rating and Stockfish's best move.</p>${chipsHtml(null)}`;
+      return;
+    }
+    const played = sans[ply];
+    if (sans.slice(0, ply + 1).some((s, k) => s !== gameSans[k])) {
+      el.innerHTML = `${titleHtml()}<p class="muted" style="margin:0">You're exploring your own line. The engine line below shows the best move in this position.</p>${chipsHtml(null)}`;
+      return;
+    }
+    const e = reviewMoves.find((m) => m.ply === ply);
+    const cls = e?.kind, c = CLASSES[cls];
+    const whose = new Chess(fenAt(ply)).turn() === review ? 'Your move' : "Opponent's move";
+    const isBest = !!e && !e.best && cls !== 'theory'; // the played move was the engine's own choice
+    const best = isBest ? played : e?.best || '';
+    const cost = e && e.loss >= 10 ? `costs about <b>${(e.loss / 100).toFixed(1)}</b> pawns` : 'is practically as good';
+    const verdict = isBest
+      ? `<p><b>${esc(moveLabel(ply, played))}</b> was Stockfish's best move.</p>`
+      : best
+        ? `<p>Best was <b>${esc(moveLabel(ply, best))}</b>. ${esc(played)} ${cost}.</p>`
+        : `<p class="muted">Press “Best move” to see what Stockfish plays here.</p>`;
+    el.innerHTML = `${titleHtml()}
+      <div class="coach-title">${c ? `${badgeHtml(cls, 'lg')}<b>${c.label}</b> ` : ''}${esc(moveLabel(ply, played))} <span class="muted" style="font-size:.85rem">· ${whose}</span></div>
+      ${c ? `<p class="muted" style="font-size:.9rem;margin:4px 0">${esc(c.desc)}</p>` : ''}
+      ${verdict}
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn small" data-mv="move">Played move</button>
+        <button class="btn small primary" data-mv="best">★ Best move</button>
+        ${best && !isBest && cls !== 'top' ? '<button class="btn small" data-mv="explain">Explain</button>' : ''}
+      </div>${chipsHtml(ply)}`;
+    el.onclick = (ev) => {
+      const b = ev.target.closest('[data-mv]');
+      if (!b) return;
+      if (b.dataset.mv === 'move') { holdArrow = false; cursor = ply + 1; rebuild(); sync(); }
+      if (b.dataset.mv === 'best') showBest(ply, best || null);
+      if (b.dataset.mv === 'explain') explain({ ...e, ply, san: played, kind: cls, bookSans: [best] });
+    };
   }
 
   function showStep(res, i) {
