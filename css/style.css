@@ -663,15 +663,6 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
 .learn-loss { font-size: .85rem; }
 .tag.learn-kind { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 .tag.learn-kind.drill { background: color-mix(in srgb, #e6a23c 28%, transparent); }
-/* ---------- back arrow (every page) ---------- */
-.backbtn {
-  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 6px 12px 6px 10px;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
-  font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer;
-}
-.backbtn:hover { background: var(--panel-hover); }
-.backbtn span { font-size: 1.1em; line-height: 1; }
-@media (max-width: 640px) { .backbtn { margin-bottom: 8px; } }
 
 /* ---------- level chips: rating range ---------- */
 .level-chip .level-range { color: var(--text); font-weight: 600; opacity: 0.85; }
