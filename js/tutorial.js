@@ -25,7 +25,7 @@ const STEPS = [
   { route: '#/', target: '.tier-box', title: 'How hard are the openings?',
     text: 'Slide between <b>First Openings</b>, <b>Next Steps</b> and <b>Master Class</b> to see the openings at that difficulty. Start with First Openings and move on when they feel easy.' },
   { route: '#/', target: '.filters', title: 'White or Black',
-    text: 'Show only the openings you play as White, as Black, or all of them.' },
+    text: '<b>All</b> shows every opening. The White/Black button shows only one side: click it again to switch (bright = White, dark = Black).' },
   { route: '#/', target: '.opening-card', title: 'An opening card',
     text: 'Each card shows the opening, the levels it suits, why it suits them and how much of it you have mastered. <b>Practice</b> tests you, <b>Learn</b> shows the moves, and <b>Quiz</b> unlocks after 2 lines in Practice.' },
   { route: '#/', target: '.opening-card a[href*="mode=learn"]', click: true, title: 'Let\'s open Learn mode',

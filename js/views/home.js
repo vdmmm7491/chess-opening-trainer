@@ -5,6 +5,7 @@ import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
 
 let sideFilter = 'all';
+let lastSide = 'w'; // the side the White/Black toggle shows while "All" is selected
 
 function levelBadges(o) {
   return (o.levels || []).map((k) => {
@@ -55,8 +56,7 @@ export function render(root) {
 
   const filters = h(`<div class="filters">
     <button class="btn small" data-f="all">All</button>
-    <button class="btn small" data-f="w">As White</button>
-    <button class="btn small" data-f="b">As Black</button>
+    <button class="btn small side-toggle" data-f="side" title="Click to switch between White and Black"><span class="side-icon"></span><span class="side-name"></span><span class="side-swap" aria-hidden="true">⇄</span></button>
   </div>`);
   root.appendChild(filters);
   const grid = h('<div class="grid"></div>');
@@ -65,7 +65,15 @@ export function render(root) {
   function draw() {
     levelBox.querySelectorAll('.level-chip').forEach((b) => b.classList.toggle('active', b.dataset.level === level));
     levelBox.querySelector('.level-blurb').textContent = LEVELS[level].blurb;
-    filters.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.f === sideFilter));
+    const side = sideFilter === 'all' ? lastSide : sideFilter;
+    const toggle = filters.querySelector('.side-toggle');
+    filters.querySelector('[data-f="all"]').classList.toggle('active', sideFilter === 'all');
+    toggle.classList.toggle('active', sideFilter !== 'all');
+    toggle.classList.toggle('w', side === 'w');
+    toggle.classList.toggle('b', side === 'b');
+    toggle.setAttribute('aria-pressed', String(sideFilter !== 'all'));
+    toggle.querySelector('.side-icon').style.backgroundImage = `url(${pieceUrl(side, 'k')})`;
+    toggle.querySelector('.side-name').textContent = side === 'w' ? 'As White' : 'As Black';
     const t = TIERS[tier], ti = TIER_KEYS.indexOf(tier);
     slider.value = ti;
     tierBox.style.setProperty('--tier', t.color);
@@ -116,7 +124,11 @@ export function render(root) {
   });
   filters.addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) { sideFilter = b.dataset.f; draw(); }
+    if (!b) return;
+    if (b.dataset.f === 'all') sideFilter = 'all';
+    // First click picks the side it shows; after that each click swaps White <-> Black.
+    else sideFilter = lastSide = sideFilter === 'all' ? lastSide : (sideFilter === 'w' ? 'b' : 'w');
+    draw();
   });
   draw();
 }
