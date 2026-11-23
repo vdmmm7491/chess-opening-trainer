@@ -1,7 +1,7 @@
 // Progress tracking stored in localStorage (per device).
 // Use Export / Import on the Profile page to move progress between devices.
 
-import { LEVELS, linesFor } from './openings.js';
+import { LEVELS, LEVEL_KEYS, linesFor } from './openings.js';
 
 const KEY = 'opening-trainer.v1';
 const DAY = 86400000;
@@ -72,6 +72,29 @@ export function recordLine(openingId, lineIdx, mistakes, level = getLevel()) {
   return s;
 }
 
+// ---- Learned lines: Practice unlocks for a line once you've played it through in Learn mode ----
+
+/** Remember that this line was played to the end in Learn mode. */
+export function recordLearned(openingId, lineIdx, level = getLevel()) {
+  state.studied = state.studied || {};
+  state.studied[keyOf(openingId, lineIdx, level)] = Date.now();
+  save();
+}
+
+/**
+ * Is Practice unlocked for this line at this level? Yes once it was learned at this level or a
+ * deeper one (which contains it). Lines practised before the lock existed count as learned.
+ */
+export function lineUnlocked(openingId, lineIdx, level = getLevel()) {
+  return LEVEL_KEYS.slice(LEVEL_KEYS.indexOf(level)).some((l) =>
+    !!state.studied?.[keyOf(openingId, lineIdx, l)] || (lineStats(openingId, lineIdx, l)?.attempts || 0) > 0);
+}
+
+/** Can you practise anything in this opening yet? */
+export function practiceUnlocked(opening, level = getLevel()) {
+  return idxs(opening, level).some((i) => lineUnlocked(opening.id, i, level));
+}
+
 // Share of a line's progress you get for completing it once (any mistakes);
 // the rest comes from its spaced-repetition level (box 0..5).
 const PLAYED_CREDIT = 0.2;
@@ -102,10 +125,15 @@ export function openingProgress(opening, level = getLevel()) {
 /** 0..1 mastery for an opening (same number the progress bars show). */
 export function mastery(opening) { return openingProgress(opening).value; }
 
-/** Pick the next line to train at your level: unseen or due first, weakest first. */
-export function pickLine(opening, exclude = -1, level = getLevel()) {
+/**
+ * Pick the next line to train at your level: unseen or due first, weakest first. Practice only
+ * picks lines you've learned, Learn starts with the ones you haven't (if there are any).
+ */
+export function pickLine(opening, exclude = -1, level = getLevel(), mode = 'practice') {
   const now = Date.now();
-  const scored = idxs(opening, level).map((i) => {
+  const all = idxs(opening, level);
+  const fit = all.filter((i) => lineUnlocked(opening.id, i, level) === (mode === 'practice'));
+  const scored = (fit.length ? fit : all).map((i) => {
     const s = lineStats(opening.id, i, level);
     let score;
     if (!s) score = -1000 + i; // unseen lines first, in order
@@ -117,9 +145,13 @@ export function pickLine(opening, exclude = -1, level = getLevel()) {
   return scored[0]?.i ?? 0;
 }
 
+/** Learned lines that are ready to be practised (again). */
 export function dueCount(opening, level = getLevel()) {
   const now = Date.now();
-  return idxs(opening, level).filter((i) => { const s = lineStats(opening.id, i, level); return !s || s.due <= now; }).length;
+  return idxs(opening, level).filter((i) => {
+    const s = lineStats(opening.id, i, level);
+    return lineUnlocked(opening.id, i, level) && (!s || s.due <= now);
+  }).length;
 }
 
 export function summary() {

@@ -1,5 +1,5 @@
 import { OPENINGS, LEVELS, TIERS, TIER_KEYS, tierForLevel, linesFor } from '../openings.js';
-import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK, practiceUnlocked } from '../progress.js';
 import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -139,8 +139,11 @@ export function render(root) {
         <div class="kv"><span class="muted">${n} line${n === 1 ? '' : 's'} · up to move ${depthAt(o, level)} · <abbr title="Encyclopaedia of Chess Openings code: the standard catalogue number for this opening, used by opening books and databases" style="text-decoration:none;cursor:help">ECO ${esc(o.eco)}</abbr></span></div>
         ${progressBar(p)}
         <div class="btn-row">
-          <a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>
-          <a class="btn small" href="#/train/${o.id}?mode=learn">Learn</a>
+          ${practiceUnlocked(o)
+            ? `<a class="btn primary small" href="#/train/${o.id}?mode=practice">Practice${due ? ` (${due} due)` : ''}</a>
+          <a class="btn small" href="#/train/${o.id}?mode=learn">Learn</a>`
+            : `<a class="btn primary small" href="#/train/${o.id}?mode=learn">Learn</a>
+          <span class="btn small locked" role="button" aria-disabled="true" title="Learn a line first to unlock">🔒 Practice</span>`}
           ${quizUnlocked(o)
             ? `<a class="btn small" href="#/quiz/${o.id}">🧩 Quiz</a>`
             : `<a class="btn small locked" href="#/quiz/${o.id}" title="Complete ${QUIZ_UNLOCK} lines in Practice to unlock">🔒 Quiz ${linesLearned(o)}/${QUIZ_UNLOCK}</a>`}

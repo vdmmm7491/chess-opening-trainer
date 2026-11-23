@@ -1,5 +1,5 @@
 import { getOpening, LEVELS, linesFor } from '../openings.js';
-import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK } from '../progress.js';
+import { recordLine, pickLine, lineStats, openingProgress, getSettings, setSetting, getLevel, setLevel, quizUnlocked, linesLearned, QUIZ_UNLOCK, recordLearned, lineUnlocked } from '../progress.js';
 import { getEngine } from '../engine.js';
 import { Board } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -108,6 +108,7 @@ export function render(root, { id, query }) {
 
   function setStatus(text, cls = '') { statusEl.className = 'status ' + cls; statusEl.innerHTML = text; }
   const coachOn = () => settings.coach !== false;
+  const unlocked = () => lineUnlocked(opening.id, lineIdx, level);
 
   // ---------------- Coach panel ----------------
   let coachEntries = [];
@@ -182,6 +183,12 @@ export function render(root, { id, query }) {
     view.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('primary', b.dataset.mode === mode));
     $('[data-act="hint"]').disabled = busy || phase !== 'book' || chess.turn() !== userColor;
     $('[data-act="playon"]').disabled = phase !== 'done';
+    const pr = $('[data-mode="practice"]');
+    const locked = !unlocked();
+    pr.classList.toggle('locked', locked);
+    pr.setAttribute('aria-disabled', String(locked));
+    pr.textContent = locked ? '🔒 Practice' : 'Practice';
+    pr.title = locked ? 'Play this line to the end in Learn mode to unlock' : '';
     const q = $('.quiz-link');
     const open = quizUnlocked(opening);
     q.classList.toggle('locked', !open);
@@ -193,8 +200,9 @@ export function render(root, { id, query }) {
     closeDone();
     timers.forEach(clearTimeout); timers.clear();
     coachToken++;
-    if (!entry(idx)) idx = pickLine(opening, -1, level);
+    if (!entry(idx)) idx = pickLine(opening, -1, level, mode);
     lineIdx = idx;
+    if (mode === 'practice' && !unlocked()) mode = 'learn'; // Practice is locked until the line is learned
     moves = entry(idx).moves;
     const pl = $('.punish-link');
     if (pl) pl.href = `#/punish/${opening.id}?line=${idx}`; // Punish opens on the line you're training
@@ -204,7 +212,7 @@ export function render(root, { id, query }) {
     renderLineList();
     const st = lineStats(opening.id, idx);
     lineInfoEl.textContent = `Line ${posOf(idx)}/${lines.length}: ${entry(idx).name} · ${LEVELS[level].name}, ${Math.ceil(moves.length / 2)} moves` +
-      (st ? ` · practised ${st.attempts}× · strength ${st.box}/5` : ' · new');
+      (st ? ` · practised ${st.attempts}× · strength ${st.box}/5` : unlocked() ? ' · learned' : ' · new, 🔒 learn it to unlock Practice');
     coachIntro();
     sync();
     if (userColor === 'b') { busy = true; setStatus('Watch White\'s move…'); later(opponentMove, 500); }
@@ -217,7 +225,7 @@ export function render(root, { id, query }) {
     $('.lines-count').textContent = `${lines.length} lines · ${LEVELS[level].name}`;
     list.innerHTML = lines.map(({ idx: i, name }, n) => {
       const st = lineStats(opening.id, i);
-      const meta = !st ? '<span class="li-new">New</span>'
+      const meta = !st ? `<span class="li-new">${lineUnlocked(opening.id, i, level) ? 'Learned' : 'New'}</span>`
         : `<span class="li-level" title="Strength ${st.box}/5">${'●'.repeat(st.box)}${'○'.repeat(5 - st.box)}</span>`;
       return `<button type="button" class="line-item${i === lineIdx ? ' cur' : ''}" data-line="${i}">
         <span class="li-num">${n + 1}</span><span class="li-name">${esc(name)}</span>${meta}</button>`;
@@ -458,11 +466,15 @@ export function render(root, { id, query }) {
           : [['next', 'Next line →'], ['playon', '▶ Play on'], ['again', '↺ Try again', true]],
       });
     } else {
-      setStatus('🎓 End of the line! Switch to Practice to test yourself.', 'good');
+      const first = !unlocked();
+      recordLearned(opening.id, lineIdx, level);
+      lineInfoEl.textContent = lineInfoEl.textContent.replace(/ · new, .*$/, ' · learned');
+      renderLineList();
+      setStatus(first ? '🎓 Line learned! Practice is now unlocked.' : '🎓 End of the line! Switch to Practice to test yourself.', 'good');
       showDone({
         icon: '🎓',
-        title: 'End of the line!',
-        sub: `You've seen every move of ${entry(lineIdx).name}. Now test yourself in Practice mode.`,
+        title: first ? 'Line learned!' : 'End of the line!',
+        sub: `You've seen every move of ${entry(lineIdx).name}. ${first ? 'Practice is unlocked: test yourself from memory.' : 'Now test yourself in Practice mode.'}`,
         actions: [['again', '↺ Replay'], ['next', 'Next line →'], ['practice', 'Practice it', true]],
       });
     }
@@ -491,6 +503,10 @@ export function render(root, { id, query }) {
   view.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.dataset.coach) return;
+    if (b.dataset.mode === 'practice' && !unlocked()) {
+      setStatus('🔒 Practice is locked. Play this line to the end in <b>Learn</b> first.', 'bad');
+      return;
+    }
     if (b.dataset.mode) { mode = b.dataset.mode; start(lineIdx); return; }
     switch (b.dataset.act) {
       case 'hint': {
@@ -538,10 +554,10 @@ export function render(root, { id, query }) {
     setLevel(level);
     lines = linesFor(opening, level);
     updateProgressBar($('.trainer-progress .pbar'), openingProgress(opening));
-    start(entry(lineIdx) ? lineIdx : pickLine(opening));
+    start(entry(lineIdx) ? lineIdx : pickLine(opening, -1, level, mode));
   });
 
-  start(query.line !== undefined && query.line !== '' && entry(firstLine) ? firstLine : pickLine(opening));
+  start(query.line !== undefined && query.line !== '' && entry(firstLine) ? firstLine : pickLine(opening, -1, level, mode));
 
   return () => { alive = false; closeDone(); coachToken++; timers.forEach(clearTimeout); analyser.cancel(); phase = 'gone'; };
 }

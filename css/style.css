@@ -336,6 +336,7 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 
 /* ---------- quiz ---------- */
 .btn.locked { opacity: 0.6; }
+.btn.locked[aria-disabled="true"] { cursor: not-allowed; }
 .locked-quiz { max-width: 520px; margin: 30px auto; text-align: center; padding: 28px 20px; }
 .locked-quiz .lock-icon { font-size: 2.5rem; }
 .locked-quiz p { color: var(--muted); line-height: 1.5; }

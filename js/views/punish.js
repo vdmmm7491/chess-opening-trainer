@@ -4,7 +4,7 @@
 // mistake or the answer until you've solved it (the hint ladder reveals it step by step).
 import { getOpening, LEVELS, LEVEL_KEYS, linesFor } from '../openings.js';
 import { PUNISH, forLevel, linesOf } from '../punish.js';
-import { recordPunish, punishStats, getLevel, setLevel } from '../progress.js';
+import { recordPunish, punishStats, getLevel, setLevel, practiceUnlocked } from '../progress.js';
 import { Board } from '../board.js';
 import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from '../ui.js';
 
@@ -32,7 +32,7 @@ export function render(root, { id, query }) {
           The board shows the position right after one of them. Something in it doesn't work: find the move that proves it.</p>
         <div class="btn-row" style="margin-top:10px">
           <a class="btn small" href="#/train/${opening.id}?mode=learn">Learn</a>
-          <a class="btn small" href="#/train/${opening.id}?mode=practice">Practice</a>
+          ${practiceUnlocked(opening) ? `<a class="btn small" href="#/train/${opening.id}?mode=practice">Practice</a>` : '<span class="btn small locked" role="button" aria-disabled="true" title="Learn a line first to unlock">🔒 Practice</span>'}
         </div>
       </div>
       <div class="card status-card">
@@ -56,7 +56,7 @@ export function render(root, { id, query }) {
         <button class="btn small" data-act="retry">↺ Retry</button>
         <button class="btn small" data-act="flip">⇅ Flip</button>
         <a class="btn small quiz-tab" href="#/train/${opening.id}?mode=learn">📖 Learn</a>
-        <a class="btn small quiz-tab" href="#/train/${opening.id}?mode=practice">🎯 Practice</a>
+        ${practiceUnlocked(opening) ? `<a class="btn small quiz-tab" href="#/train/${opening.id}?mode=practice">🎯 Practice</a>` : '<span class="btn small quiz-tab locked" role="button" aria-disabled="true" title="Learn a line first to unlock">🔒 Practice</span>'}
       </nav>
     </aside>
   </div>`);

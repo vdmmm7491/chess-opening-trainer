@@ -23,7 +23,7 @@ Free, open source, runs in your browser. No account, no install, no ads.
 1. **Open the site:** <https://vdmmm7491.github.io/chess-opening-trainer/>. Nothing to sign up for or install.
 2. **Pick an opening.** The **Openings** page shows one difficulty tier at a time (First Openings → Next Steps → Master Class). Use the slider to switch tiers and the **White/Black** button to filter by colour. Not sure where to start? Stay on **First Openings**.
 3. **Learn it.** Open the opening in **Learn** mode. An arrow shows the next book move and the coach explains why it's played. Just play the arrow moves.
-4. **Practise it.** Switch to **Practice** and play the same lines from memory. If you play a wrong move, the coach tells you the right one and why, then you try again.
+4. **Practise it.** Once you've played a line to the end in Learn, **Practice** unlocks for it. Switch to it and play the same lines from memory. If you play a wrong move, the coach tells you the right one and why, then you try again.
 5. **Come back tomorrow.** Lines you get wrong come back sooner (spaced repetition). A few minutes a day is enough. Your progress is saved in your browser.
 
 After that, try **⚔️ Punish** (common opponent mistakes and how to punish them) and the **Quiz**, or add your Chess.com username on the **Review** tab.

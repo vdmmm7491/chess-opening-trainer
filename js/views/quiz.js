@@ -1,6 +1,6 @@
 // Quiz: random positions from one opening; find the book move (move 3 onwards) or punish a mistake.
 import { getOpening, linesFor, levelForRating, LEVEL_KEYS } from '../openings.js';
-import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK, getLevel } from '../progress.js';
+import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK, getLevel, practiceUnlocked } from '../progress.js';
 import { Board } from '../board.js';
 import { noteFor } from '../coach.js';
 import { PUNISH } from '../punish.js';
@@ -73,8 +73,9 @@ export function render(root, { id }) {
       <p>Complete <b>${QUIZ_UNLOCK} lines</b> of this opening in <b>Practice</b> mode to unlock the quiz. You've done <b>${done} / ${QUIZ_UNLOCK}</b>.</p>
       <div class="bar" style="margin:12px auto;max-width:320px"><span style="width:${(done / QUIZ_UNLOCK) * 100}%"></span></div>
       <div class="btn-row" style="justify-content:center">
-        <a class="btn primary" href="#/train/${opening.id}?mode=practice">Practice a line</a>
-        <a class="btn" href="#/train/${opening.id}?mode=learn">Learn first</a>
+        ${practiceUnlocked(opening) ? `<a class="btn primary" href="#/train/${opening.id}?mode=practice">Practice a line</a>
+        <a class="btn" href="#/train/${opening.id}?mode=learn">Learn first</a>`
+          : `<a class="btn primary" href="#/train/${opening.id}?mode=learn">Learn a line first</a>`}
       </div>
     </section>`));
     return;
