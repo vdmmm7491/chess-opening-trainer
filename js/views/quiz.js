@@ -1,14 +1,24 @@
-// Quiz: random positions from one opening (move 3 onwards); find the book move.
-import { getOpening, linesFor } from '../openings.js';
+// Quiz: random positions from one opening; find the book move (move 3 onwards) or punish a mistake.
+import { getOpening, linesFor, levelForRating, LEVEL_KEYS } from '../openings.js';
 import { recordQuiz, quizStats, quizUnlocked, linesLearned, QUIZ_UNLOCK, getLevel } from '../progress.js';
 import { Board } from '../board.js';
 import { noteFor } from '../coach.js';
+import { PUNISH } from '../punish.js';
+import { QUIZ_PUNISH } from '../quiz-punish.js';
 import { h, esc, Chess, destsFn, checkSquare, lastMoveOf, renderMoveList } from '../ui.js';
 
 const ROUND = 10;
+const AUTO_NEXT = 10000; // ms after an answer until the next question opens by itself
+const AUTO_SHOW = 2000; // ms after an answer until the timer on the Next button starts to fill
 const moveNo = (ply, san) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '...'}${san}`;
 
-/** Every position in the opening (at your level) where it's your move, from move 3 on, with all book answers. */
+/** The square a SAN move captures on, or null if it isn't a capture. */
+const captureSq = (san) => san.match(/x([a-h][1-8])/)?.[1] || null;
+/** Is `san` a recapture: taking back on the square where the opponent just captured? */
+const isRecapture = (prev, san) => !!captureSq(prev) && captureSq(prev) === captureSq(san);
+
+/** Every position in the opening (at your level) where it's your move, from move 3 on, with all book answers.
+    Positions answered by a recapture are left out: they are too obvious to ask. */
 export function quizPositions(opening, level = getLevel()) {
   const map = new Map();
   linesFor(opening, level).forEach(({ moves: mv, name }) => {
@@ -22,7 +32,29 @@ export function quizPositions(opening, level = getLevel()) {
       map.set(key, e);
     }
   });
-  return [...map.values()];
+  const book = [...map.values()].filter((q) => ![...q.answers].some((a) => isRecapture(q.history.at(-1), a)));
+  return [...book, ...punishPositions(opening, level)];
+}
+
+/** "Find the punishment" questions: the opponent's mistakes from Punish mode up to your level (or the
+    next level up if the opening has none at yours).
+    QUIZ_PUNISH lists which of the punishing moves have one clearly best answer. */
+function punishPositions(opening, level) {
+  const li = LEVEL_KEYS.indexOf(level);
+  const levelOf = (e) => LEVEL_KEYS.indexOf(levelForRating(e.elo));
+  const drills = (PUNISH[opening.id] || []).filter((e) => QUIZ_PUNISH[opening.id]?.[e.name]);
+  const max = drills.some((e) => levelOf(e) <= li) ? li : li + 1;
+  const out = [];
+  for (const e of drills.filter((d) => levelOf(d) <= max)) {
+    const setup = e.moves.split(' '), sol = e.punish.split(' ');
+    for (const step of QUIZ_PUNISH[opening.id][e.name]) {
+      const history = [...setup, ...sol.slice(0, step)];
+      if (!sol[step] || isRecapture(history.at(-1), sol[step])) continue;
+      const mistake = `${moveNo(setup.length - 1, setup.at(-1))}?`;
+      out.push({ history, answers: new Set([sol[step]]), lines: new Set(), punish: { ...e, mistake, hint: e.mistake, step } });
+    }
+  }
+  return out;
 }
 
 function shuffle(a) {
@@ -54,18 +86,18 @@ export function render(root, { id }) {
     <div><div class="board-wrap"><div class="board"></div></div></div>
     <aside class="side">
       <div class="card quiz-intro">
-        <div class="kv" style="align-items:center"><h1 style="margin:0">🧩 ${esc(opening.name)} quiz</h1>
-          <span class="tag ${userColor}">You play ${userColor === 'w' ? 'White' : 'Black'}</span></div>
-        <p class="muted" style="margin:8px 0 0;font-size:.9rem">Random positions from all ${linesFor(opening, getLevel()).length} lines at your level (move 3 onwards). Find the book move. You get one try.</p>
+        <h1 style="margin:0">🧩 ${esc(opening.name)} quiz</h1>
+        <p class="muted" style="margin:8px 0 0;font-size:.9rem">Random positions from all ${linesFor(opening, getLevel()).length} lines at your level (move 3 onwards). Find the book move, or punish your opponent's mistake. You get one try.</p>
         <div class="btn-row" style="margin-top:10px">
           <a class="btn small" href="#/train/${opening.id}?mode=learn">Learn</a>
           <a class="btn small" href="#/train/${opening.id}?mode=practice">Practice</a>
         </div>
       </div>
       <div class="card status-card">
-        <div class="quiz-head"><b>🧩 ${esc(opening.name)}</b><span class="tag ${userColor}">${userColor === 'w' ? 'White' : 'Black'}</span></div>
+        <div class="quiz-head"><b>🧩 ${esc(opening.name)}</b></div>
         <div class="quiz-progress"><span class="q-num"></span><span class="q-score"></span><span class="quiz-best muted"></span></div>
         <div class="bar" style="margin:8px 0"><span class="q-bar" style="width:0"></span></div>
+        <div class="quiz-result" hidden></div>
         <div class="status"></div>
         <div class="movelist" style="margin-top:6px"></div>
       </div>
@@ -75,6 +107,7 @@ export function render(root, { id }) {
       </div>
       <nav class="card btn-row quiz-actions" aria-label="Quiz actions">
         <button class="btn small primary" data-act="next" disabled>Next question →</button>
+        <a class="btn small primary" data-act="home" href="#/" hidden>← Back to openings</a>
         <button class="btn small" data-act="hint">💡 Hint</button>
         <button class="btn small" data-act="restart">↺ New round</button>
         <button class="btn small" data-act="flip">⇅ Flip</button>
@@ -96,17 +129,51 @@ export function render(root, { id }) {
     onMove: (from, to, promo) => answer(from, to, promo),
   });
 
+  // After an answer the quiz moves on by itself; the Next button fills up as a timer.
+  let autoTimer = 0;
+  function stopAuto() {
+    clearTimeout(autoTimer);
+    $('[data-act="next"]').classList.remove('auto-next');
+  }
+  function startAuto() {
+    stopAuto();
+    const b = $('[data-act="next"]');
+    b.style.setProperty('--auto-delay', `${AUTO_SHOW}ms`);
+    b.style.setProperty('--auto-time', `${AUTO_NEXT - AUTO_SHOW}ms`);
+    b.classList.add('auto-next');
+    autoTimer = setTimeout(next, AUTO_NEXT);
+  }
+  function next() {
+    stopAuto();
+    if (qi + 1 < questions.length) { qi++; showQuestion(); }
+  }
+  /** After the last question the Next button makes way for "Back to openings". */
+  function showFinished(on) {
+    $('[data-act="next"]').hidden = on;
+    $('[data-act="home"]').hidden = !on;
+    $('.quiz-result').hidden = !on;
+  }
+
   function setStatus(html, cls = '') { const s = $('.status'); s.className = 'status ' + cls; s.innerHTML = html; }
 
   function newRound() {
     if (!all.length) { setStatus('This opening has no quiz positions yet.'); return; }
     // Avoid repeats inside a round; if an opening has fewer than 10 positions, use them all.
-    questions = shuffle([...all]).slice(0, Math.min(ROUND, all.length));
+    // One question per mistake: a later step of a punishment gives away the earlier one.
+    const seen = new Set();
+    questions = shuffle([...all]).filter((q) => {
+      if (!q.punish) return true;
+      const first = !seen.has(q.punish.name);
+      seen.add(q.punish.name);
+      return first;
+    }).slice(0, ROUND);
     qi = 0; score = 0;
     showQuestion();
   }
 
   function showQuestion() {
+    stopAuto();
+    showFinished(false);
     answered = false;
     hinted = false;
     const q = questions[qi];
@@ -121,8 +188,18 @@ export function render(root, { id }) {
     $('.q-score').textContent = `Score ${score}`;
     $('.q-bar').style.width = `${(qi / questions.length) * 100}%`;
     const last = q.history.length - 1;
-    setStatus(`${userColor === 'w' ? 'White' : 'Black'} to move after <b>${esc(moveNo(last, q.history[last]))}</b>. What's the book move?`);
-    coachBody.innerHTML = `<p class="muted">From the line${q.lines.size > 1 ? 's' : ''}: ${esc([...q.lines].join(', '))}.</p>`;
+    if (q.punish) {
+      const them = userColor === 'w' ? 'Black' : 'White';
+      const lastMove = esc(moveNo(last, q.history[last]));
+      setStatus(q.punish.step === 0
+        ? `${them} played <b class="bad">${lastMove}?</b> Find the punishment!`
+        : `You're punishing <b class="bad">${esc(q.punish.mistake)}</b> and ${them} answered <b>${lastMove}</b>. What's next?`);
+      coachBody.innerHTML = `<div class="coach-entry mistake"><div class="coach-title">What's wrong with <b>${esc(q.punish.mistake)}</b></div>
+        <p class="coach-idea">${esc(q.punish.hint)}</p></div>`;
+    } else {
+      setStatus(`${userColor === 'w' ? 'White' : 'Black'} to move after <b>${esc(moveNo(last, q.history[last]))}</b>. What's the book move?`);
+      coachBody.innerHTML = `<p class="muted">From the line${q.lines.size > 1 ? 's' : ''}: ${esc([...q.lines].join(', '))}.</p>`;
+    }
     $('[data-act="next"]').disabled = true;
     $('[data-act="hint"]').disabled = false;
   }
@@ -158,10 +235,10 @@ export function render(root, { id }) {
       const r = t.move(right);
       board.setFen(chess.fen(), lastMoveOf(chess), checkSquare(chess));
       board.setArrows([{ from: r.from, to: r.to }]);
-      setStatus(`✗ ${esc(m.san)} isn't the book move. The answer is <b>${esc(right)}</b>.`, 'bad');
+      setStatus(`✗ ${esc(m.san)} isn't the ${q.punish ? 'punishment' : 'book move'}. The answer is <b>${esc(right)}</b>.`, 'bad');
     }
     const ply = q.history.length;
-    const notes = [...q.answers].map((a) => ({ san: a, note: noteFor([...q.history, a]) }));
+    const notes = [...q.answers].map((a) => ({ san: a, note: q.punish ? q.punish.why : noteFor([...q.history, a]) }));
     coachBody.innerHTML = notes.map((n) => `<div class="coach-entry ${correct ? 'you' : 'next'}">
       <div class="coach-title">Why <b>${esc(moveNo(ply, n.san))}</b>${notes.length > 1 ? ' (one of the book moves)' : ''}</div>
       ${n.note ? `<p class="coach-idea">${esc(n.note)}</p>` : ''}</div>`).join('');
@@ -169,28 +246,31 @@ export function render(root, { id }) {
     $('.q-bar').style.width = `${((qi + 1) / questions.length) * 100}%`;
     // Phones: make sure the whole explanation sits above the fixed bottom bar.
     if (matchMedia('(max-width: 900px)').matches) $('.coach').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    const nextBtn = $('[data-act="next"]');
-    nextBtn.disabled = false;
-    nextBtn.textContent = qi + 1 < questions.length ? 'Next question →' : 'See result';
+    if (qi + 1 === questions.length) { finish(); return; }
+    $('[data-act="next"]').disabled = false;
+    startAuto();
   }
 
+  /** Round over (called with the last answer still on screen): congratulate and show the score. */
   function finish() {
     const stats = recordQuiz(opening.id, score, questions.length);
     const pct = Math.round((score / questions.length) * 100);
-    const msg = pct === 100 ? '🏆 Perfect round!' : pct >= 80 ? '🎉 Great job!' : pct >= 50 ? 'Good effort. Keep drilling!' : 'Keep practising this opening. Try Learn mode first.';
-    setStatus(`<b>${score} / ${questions.length}</b> correct (${pct}%). ${msg}`, pct >= 80 ? 'good' : '');
-    coachBody.innerHTML = `<div class="coach-entry"><div class="coach-title">Round finished</div>
-      <p>Best score: <b>${stats.best} / ${stats.bestOf}</b> · rounds played: ${stats.rounds}</p></div>`;
-    $('[data-act="next"]').disabled = true;
-    $('[data-act="hint"]').disabled = true;
+    const msg = pct === 100 ? 'Perfect round!' : pct >= 80 ? 'Great job!' : pct >= 50 ? 'Good effort. Keep drilling!' : 'Keep practising, you\'ll get there!';
+    $('.quiz-result').innerHTML = `<b class="qr-title">${pct === 100 ? '🏆' : '🎉'} Congratulations, you finished the quiz!</b>
+      <span class="qr-score">${score} / ${questions.length}</span>
+      <span>${pct}% correct. ${msg}</span>
+      <span class="muted">Best score: ${stats.best} / ${stats.bestOf} · rounds played: ${stats.rounds}</span>
+      <a class="btn small primary qr-home" href="#/">← Back to openings</a>`;
+    showFinished(true);
     $('.q-num').textContent = 'Finished';
     $('.quiz-best').textContent = `Best: ${stats.best} / ${stats.bestOf}`;
+    if (matchMedia('(max-width: 900px)').matches) $('.quiz-result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   view.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.act === 'next') { if (qi + 1 < questions.length) { qi++; showQuestion(); } else finish(); }
+    if (b.dataset.act === 'next') next();
     if (b.dataset.act === 'hint') hint();
     if (b.dataset.act === 'restart') newRound();
     if (b.dataset.act === 'flip') board.flip();
@@ -199,4 +279,5 @@ export function render(root, { id }) {
   const prev = quizStats(opening.id);
   if (prev) $('.quiz-best').textContent = `Best: ${prev.best} / ${prev.bestOf}`;
   newRound();
+  return stopAuto;
 }

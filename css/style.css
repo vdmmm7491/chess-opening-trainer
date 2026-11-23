@@ -349,6 +349,26 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 /* Opening name line inside the status card and the Learn/Practice tabs: phones only. */
 .quiz-head { display: none; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .quiz-actions .quiz-tab { display: none; }
+/* Next button filling up until the next question opens by itself (times set in quiz.js). */
+.btn.auto-next { position: relative; overflow: hidden; isolation: isolate; }
+.btn.auto-next::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: rgba(0,0,0,0.3);
+  transform: scaleX(0); transform-origin: left; animation: auto-next var(--auto-time) linear var(--auto-delay) forwards;
+}
+@keyframes auto-next { to { transform: scaleX(1); } }
+.quiz-view [hidden] { display: none; }
+/* Congratulations block at the end of a round. */
+.quiz-result {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  margin-bottom: 10px; padding: 12px; border-radius: 8px; font-size: 0.92rem;
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel-2));
+}
+.quiz-result .qr-title { font-size: 1.05rem; }
+.quiz-result .qr-score { font-size: 2rem; font-weight: 800; line-height: 1.2; color: var(--good); }
+/* Desktop: the back button sits in the box; phones have it in the bottom bar. */
+.quiz-result .qr-home { margin-top: 8px; }
+@media (min-width: 901px) { .quiz-actions [data-act="home"] { display: none; } }
+@media (max-width: 900px) { .quiz-result .qr-home { display: none; } }
 
 /* ---------- coach ---------- */
 .coach { border-left: 4px solid var(--accent); }
