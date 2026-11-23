@@ -42,6 +42,15 @@ export function render(root, { id, query }) {
         <button class="btn small" data-act="flip">⇅ Flip</button>
       </div>
     </div>
+    <dialog class="line-done" aria-labelledby="ld-title">
+      <button class="ld-close" type="button" data-done="close" aria-label="Close">✕</button>
+      <div class="ld-icon"></div>
+      <h2 id="ld-title" class="ld-title"></h2>
+      <p class="ld-sub muted"></p>
+      <div class="ld-stats"></div>
+      <div class="ld-extra"></div>
+      <div class="ld-actions"></div>
+    </dialog>
     <aside class="side">
       <div class="card">
         <div class="kv" style="align-items:center"><h1 style="margin:0">${esc(opening.name)}</h1>
@@ -181,6 +190,7 @@ export function render(root, { id, query }) {
   }
 
   function start(idx) {
+    closeDone();
     timers.forEach(clearTimeout); timers.clear();
     coachToken++;
     if (!entry(idx)) idx = pickLine(opening, -1, level);
@@ -376,6 +386,41 @@ export function render(root, { id, query }) {
     promptUser();
   }
 
+  // ---------------- "Line complete" window ----------------
+  const doneDlg = $('.line-done');
+  function closeDone() { clearTimeout(doneTimer); if (doneDlg.open) doneDlg.close(); }
+  let doneTimer = 0;
+  function showDone({ icon, title, sub, stats = '', extra = '', actions }) {
+    doneDlg.querySelector('.ld-icon').textContent = icon;
+    doneDlg.querySelector('.ld-title').textContent = title;
+    doneDlg.querySelector('.ld-sub').textContent = sub;
+    doneDlg.querySelector('.ld-stats').innerHTML = stats;
+    doneDlg.querySelector('.ld-extra').innerHTML = extra;
+    doneDlg.querySelector('.ld-actions').innerHTML = actions.map(([act, label, primary]) =>
+      `<button class="btn${primary ? ' primary' : ''}" type="button" data-done="${act}">${label}</button>`).join('');
+    doneDlg.classList.toggle('perfect', icon === '🎉' || icon === '🎓');
+    // let the last move finish animating before the window pops up
+    clearTimeout(doneTimer);
+    doneTimer = setTimeout(() => {
+      if (!alive || phase !== 'done' || doneDlg.open) return;
+      doneDlg.showModal();
+      doneDlg.querySelector('.btn.primary')?.focus();
+    }, 650);
+  }
+  doneDlg.addEventListener('click', (e) => {
+    if (e.target === doneDlg) { closeDone(); return; } // click on the backdrop
+    const b = e.target.closest('[data-done]');
+    if (!b) return;
+    e.stopPropagation();
+    closeDone();
+    switch (b.dataset.done) {
+      case 'next': start(lines[posOf(lineIdx) % lines.length].idx); break;
+      case 'again': start(lineIdx); break;
+      case 'practice': mode = 'practice'; start(lineIdx); break;
+      case 'playon': $('[data-act="playon"]').click(); break;
+    }
+  });
+
   function complete() {
     phase = 'done';
     busy = false;
@@ -395,8 +440,29 @@ export function render(root, { id, query }) {
         $('.status').insertAdjacentHTML('beforeend',
           `<div class="unlock">🧩 Quiz unlocked! <a href="#/quiz/${opening.id}">Test yourself now →</a></div>`);
       }
+      const stars = '★'.repeat(s.box) + `<span class="off">${'★'.repeat(Math.max(0, 5 - s.box))}</span>`;
+      showDone({
+        icon: mistakes === 0 ? '🎉' : '✅',
+        title: mistakes === 0 ? 'Line complete!' : 'Line done',
+        sub: mistakes === 0
+          ? `You played ${entry(lineIdx).name} without a single mistake.`
+          : `You finished ${entry(lineIdx).name} with ${mistakes} mistake${mistakes > 1 ? 's' : ''}. It will come back sooner for review.`,
+        stats: `<div><b>${mistakes}</b><span>mistake${mistakes === 1 ? '' : 's'}</span></div>
+          <div><b>${Math.ceil(moves.length / 2)}</b><span>moves</span></div>
+          <div><b class="ld-stars" title="Strength ${s.box}/5">${stars}</b><span>strength</span></div>`,
+        extra: justUnlocked ? `<div class="unlock">🧩 Quiz unlocked! <a href="#/quiz/${opening.id}">Test yourself now →</a></div>` : '',
+        actions: mistakes === 0
+          ? [['again', '↺ Again'], ['playon', '▶ Play on'], ['next', 'Next line →', true]]
+          : [['next', 'Next line →'], ['playon', '▶ Play on'], ['again', '↺ Try again', true]],
+      });
     } else {
       setStatus('🎓 End of the line! Switch to Practice to test yourself.', 'good');
+      showDone({
+        icon: '🎓',
+        title: 'End of the line!',
+        sub: `You've seen every move of ${entry(lineIdx).name}. Now test yourself in Practice mode.`,
+        actions: [['again', '↺ Replay'], ['next', 'Next line →'], ['practice', 'Practice it', true]],
+      });
     }
     sync();
   }
@@ -475,5 +541,5 @@ export function render(root, { id, query }) {
 
   start(query.line !== undefined && query.line !== '' && entry(firstLine) ? firstLine : pickLine(opening));
 
-  return () => { alive = false; coachToken++; timers.forEach(clearTimeout); analyser.cancel(); phase = 'gone'; };
+  return () => { alive = false; closeDone(); coachToken++; timers.forEach(clearTimeout); analyser.cancel(); phase = 'gone'; };
 }
