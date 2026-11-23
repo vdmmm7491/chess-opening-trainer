@@ -46,14 +46,16 @@ export function render(root) {
   let tier = TIERS[getSettings().tier] ? getSettings().tier : tierForLevel(level);
   const tierBox = h(`<div class="card tier-box">
     <div class="tier-head"><b>Openings</b> <span class="muted">Slide to pick how hard the openings are.</span></div>
-    <div class="tier-track">
-      <div class="tier-fill"></div>
-      ${TIER_KEYS.map((k, i) => `<span class="tier-stop" style="--p:${i / (TIER_KEYS.length - 1)}"></span>`).join('')}
-      <div class="tier-thumb"></div>
-      <input type="range" class="tier-slider" min="0" max="${TIER_KEYS.length - 1}" step="any" aria-label="Opening tier">
-    </div>
-    <div class="tier-labels">
-      ${TIER_KEYS.map((k, i) => `<button class="tier-label" data-i="${i}" style="--tier:${TIERS[k].color}">${esc(TIERS[k].name)}</button>`).join('')}
+    <div class="tier-control">
+      <div class="tier-track">
+        <div class="tier-fill"></div>
+        ${TIER_KEYS.map((k, i) => `<span class="tier-stop" style="--p:${i / (TIER_KEYS.length - 1)}"></span>`).join('')}
+        <div class="tier-thumb"></div>
+        <input type="range" class="tier-slider" min="0" max="${TIER_KEYS.length - 1}" step="any" aria-label="Opening tier">
+      </div>
+      <div class="tier-labels">
+        ${TIER_KEYS.map((k, i) => `<button class="tier-label" data-i="${i}" style="--tier:${TIERS[k].color}">${esc(TIERS[k].name)}</button>`).join('')}
+      </div>
     </div>
     <p class="muted tier-blurb"></p>
   </div>`);
