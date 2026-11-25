@@ -10,6 +10,7 @@ import * as punish from './views/punish.js';
 import { applyTheme, openSettings } from './theme.js';
 import { initCorner } from './corner.js';
 import { initTutorial } from './tutorial.js';
+import { initCloud } from './cloud.js';
 
 applyTheme();
 initCorner();
@@ -51,3 +52,11 @@ function route() {
 
 window.addEventListener('hashchange', route);
 route();
+
+// Cloud sync: when it brings in progress from another device, redraw pages that show progress
+// (not the trainer or quiz, which would lose the position on the board).
+window.addEventListener('progress-synced', () => {
+  const page = parse().parts[0] || 'home';
+  if (page === 'home' || page === 'progress') route();
+});
+initCloud();

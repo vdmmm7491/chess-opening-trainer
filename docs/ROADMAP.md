@@ -13,7 +13,7 @@
 - [ ] **Import a PGN repertoire** (e.g. a Lichess/Chessable study export) as a custom opening
 - [ ] **Branching training**: when the opponent has several book replies, choose randomly (weighted by popularity)
 - [ ] **Stronger engine**: Stockfish 16/17 "lite single-threaded" WASM build (NNUE) for much better opening evaluations. It needs the `.wasm` file next to the JS file.
-- [ ] **Cloud sync of progress** (optional login). Ideas: Supabase/Firebase free tier, or a GitHub Gist as storage
+- [x] **Cloud sync of progress** (optional sign-in with an emailed link, Supabase)
 - [ ] **Lichess account support** (lichess.org/api/games/user/{name}, NDJSON stream)
 - [ ] Offline support with a service worker (PWA)
 - [ ] Sounds for moves and captures, board/piece themes

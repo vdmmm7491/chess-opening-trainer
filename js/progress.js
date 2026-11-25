@@ -1,5 +1,6 @@
 // Progress tracking stored in localStorage (per device).
-// Use Export / Import on the Profile page to move progress between devices.
+// Use Export / Import on the Progress page to move progress between devices, or sign in to
+// cloud sync (js/cloud.js), which merges this state with the copy saved online (mergeStates).
 
 import { LEVELS, LEVEL_KEYS, linesFor, cutMoves, getOpening } from './openings.js';
 
@@ -22,8 +23,13 @@ function load() {
   return blank();
 }
 
-function save() {
+const saveListeners = new Set();
+/** Call `fn` after every save (cloud sync uploads the change). Returns an unsubscribe function. */
+export function onSave(fn) { saveListeners.add(fn); return () => saveListeners.delete(fn); }
+
+function save(notify = true) {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full / private mode */ }
+  if (notify) for (const fn of saveListeners) { try { fn(); } catch { /* a listener must not break saving */ } }
 }
 
 export function today(d = new Date()) {
@@ -292,3 +298,51 @@ export function importJson(text) {
   save();
 }
 export function resetAll() { state = blank(); save(); }
+
+// ---- Cloud sync helpers ----
+
+/** A copy of the whole progress state (what cloud sync uploads). */
+export function snapshot() { return JSON.parse(JSON.stringify(state)); }
+
+/** Replace the state with `s` (already merged) without telling the save listeners. */
+export function replaceState(s) {
+  state = { ...blank(), ...s, settings: { ...blank().settings, ...s.settings } };
+  save(false);
+}
+
+const hasProgress = (s) => Object.keys(s.lines || {}).length > 0 || (s.history || []).length > 0;
+const newer = (a, b) => (!a ? b : !b ? a : (b.last || 0) > (a.last || 0) ? b : a);
+function mergeMaps(a = {}, b = {}, pick) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = k in out ? pick(out[k], v) : v;
+  return out;
+}
+
+/**
+ * Combine two copies of the progress state (this device and the cloud) without losing either
+ * side's training. Counts can't be added up, because both copies usually share a history, so
+ * each record keeps its most recent or best version.
+ */
+export function mergeStates(a, b) {
+  if (!b) return a;
+  if (!a) return b;
+  const out = { ...b, ...a };
+  out.lines = mergeMaps(a.lines, b.lines, newer);
+  out.studied = mergeMaps(a.studied, b.studied, Math.max);
+  out.days = mergeMaps(a.days, b.days, Math.max);
+  const seen = new Set();
+  out.history = [...(a.history || []), ...(b.history || [])]
+    .filter((e) => { const k = `${e.t}|${e.id}|${e.line}|${e.level}`; return seen.has(k) ? false : seen.add(k); })
+    .sort((x, y) => y.t - x.t).slice(0, 300);
+  out.quiz = mergeMaps(a.quiz, b.quiz, (x, y) => {
+    const best = y.best / (y.bestOf || 1) > x.best / (x.bestOf || 1) ? y : x;
+    return { ...newer(x, y), rounds: Math.max(x.rounds, y.rounds), best: best.best, bestOf: best.bestOf, last: Math.max(x.last || 0, y.last || 0) };
+  });
+  out.punish = mergeMaps(a.punish, b.punish, (x, y) => mergeMaps(x, y, (p, q) => ({
+    n: Math.max(p.n || 0, q.n || 0), clean: !!(p.clean || q.clean), last: Math.max(p.last || 0, q.last || 0),
+  })));
+  // Settings: a fresh device takes the saved ones; otherwise this device's choices win.
+  out.settings = hasProgress(a) ? { ...b.settings, ...a.settings } : { ...a.settings, ...b.settings };
+  for (const k of ['studied', 'quiz', 'punish']) if (!a[k] && !b[k]) delete out[k];
+  return out;
+}

@@ -8,7 +8,7 @@
 
 **Learn your chess openings by playing them, not by reading about them.**
 
-Free, open source, runs in your browser. No account, no install, no ads.
+Free, open source, runs in your browser. No account needed, no install, no ads.
 
 <img src="docs/screenshots/home.png" alt="The openings page, with rating filters and progress for each opening" width="900">
 
@@ -28,7 +28,7 @@ Free, open source, runs in your browser. No account, no install, no ads.
 
 After that, try **⚔️ Punish** (common opponent mistakes and how to punish them) and the **Quiz**, or add your Chess.com username on the **Review** tab.
 
-> Your progress lives in this browser only (localStorage). Clearing site data erases it. Use export/import on the **Profile** page to move it to another device.
+> Your progress lives in this browser (localStorage). Clearing site data erases it. To use it on another device, sign in under **Sync between devices** on the **Progress** page (optional, emailed link, no password), or use export/import there.
 
 ---
 
