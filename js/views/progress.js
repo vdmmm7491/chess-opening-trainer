@@ -5,6 +5,7 @@ import { loadGames } from '../chesscom.js';
 import { recommend, levelName, prettyFamily } from '../recommend.js';
 import { cloudStatus, pushReplace } from '../cloud.js';
 import { cloudPanel } from '../account.js';
+import { saveSuggestions } from '../suggest.js';
 
 export function render(root) {
   let alive = true;
@@ -146,6 +147,7 @@ function learnNextSection(isAlive) {
       if (isAlive()) { pb.hidden = true; msg.textContent = '⚠ ' + e.message; }
       return;
     }
+    saveSuggestions(games, user); // the "Suggested" tags on the home page cards
     if (!isAlive()) return;
     pb.hidden = true;
     show();

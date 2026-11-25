@@ -17,6 +17,8 @@
   --bad: #ef5350;
   --signin: #8b5cf6;          /* violet: the Sign in button, apart from the blue accent */
   --signin-hover: #a07bff;
+  --star: #f2b544;            /* starred openings */
+  --sugg: #2dc6b4;            /* "Suggested" tag */
   --light-sq: #dde3ea;
   --dark-sq: #6f84a0;
   --hl: rgba(255, 196, 61, 0.42);
@@ -44,6 +46,8 @@
   --bad: #d32f2f;
   --signin: #7c3aed;
   --signin-hover: #8b5cf6;
+  --star: #d08a00;
+  --sugg: #0f8f80;
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   color-scheme: light;
 }
@@ -166,7 +170,22 @@ h2 { font-size: 1.15rem; margin: 20px 0 10px; font-weight: 700; }
 .opening-card { display: flex; flex-direction: column; gap: 9px; transition: transform 0.12s, border-color 0.12s; }
 .opening-card:hover { transform: translateY(-2px); border-color: var(--accent); }
 .opening-card .title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.opening-card .title-left { display: flex; align-items: center; gap: 10px; }
+.opening-card .title-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.opening-card .title-right { display: flex; align-items: center; gap: 6px; flex: none; }
+/* Small teal ellipse: picked for you from your Chess.com games */
+.sugg-pill {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.2px; padding: 2px 8px; border-radius: 999px; cursor: help;
+  color: var(--sugg); background: color-mix(in srgb, var(--sugg) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sugg) 55%, transparent);
+}
+.star-btn {
+  width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: none; border-radius: 50%;
+  background: none; color: var(--muted); font-size: 1.25rem; line-height: 1; cursor: pointer;
+}
+.star-btn:hover { background: var(--panel-hover); color: var(--star); }
+.star-btn.on { color: var(--star); }
+.star-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.filters .star-filter.active { background: var(--star); color: #1b1a18; }
 .opening-card .thumb { width: 38px; height: 38px; border-radius: 8px; background: var(--light-sq) center/80% no-repeat; flex: none; }
 .opening-card .thumb.b { background-color: var(--dark-sq); }
 .opening-card h3 { margin: 0; font-size: 1.05rem; }
@@ -547,7 +566,7 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   h1 { font-size: 1.25rem; }
 }
 
-/* ---------- corner: quote + recommended reads ---------- */
+/* ---------- corner: quote ---------- */
 .corner { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 15; }
 .corner-card { position: relative; width: 300px; max-height: calc(100vh - 110px); overflow-y: auto; padding: 14px 16px 12px; font-size: 0.88rem; }
 .corner.min .corner-card { display: none; }
@@ -562,19 +581,9 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   border: none; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1;
 }
 .corner-close:hover { background: var(--panel-hover); color: var(--text); }
-.corner-quote { margin: 0 22px 10px 0; }
+.corner-quote { margin: 0 22px 2px 0; }
 .corner-quote blockquote { margin: 0; font-style: italic; line-height: 1.45; }
 .corner-quote figcaption { margin-top: 6px; color: var(--muted); font-weight: 600; font-size: 0.82rem; }
-.corner-books { border-top: 1px solid var(--border); padding-top: 8px; }
-.corner-books summary { cursor: pointer; font-weight: 700; color: var(--link); }
-.corner-books ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.corner-books li { display: flex; flex-direction: column; gap: 1px; }
-.corner-books li a { font-weight: 700; text-decoration: none; }
-.corner-books li a:hover { text-decoration: underline; }
-.corner-meta { color: var(--muted); font-size: 0.8rem; }
-.corner-star { color: var(--warn); font-weight: 700; }
-.corner-why { font-size: 0.8rem; }
-.corner-src { margin: 8px 0 0; color: var(--muted); font-size: 0.72rem; }
 
 /* Phones/tablets: sit in the page flow above the footer instead of floating over the board. */
 @media (max-width: 900px) {
@@ -777,8 +786,6 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .corner-fab { transform: scale(1.2); transform-origin: bottom right; }
   .corner-quote blockquote { font-size: 1.08rem; line-height: 1.5; }
   .corner-quote figcaption { font-size: 0.92rem; }
-  .corner-meta, .corner-why { font-size: 0.88rem; }
-  .corner-src { font-size: 0.8rem; }
   .tutorial-fab { height: 52px; font-size: 1.02rem; }
 }
 @media (min-width: 1600px) {

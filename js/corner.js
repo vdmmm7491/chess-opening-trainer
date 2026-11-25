@@ -1,6 +1,6 @@
-// Bottom-corner widget: a rotating master quote plus recommended reads.
+// Bottom-corner widget: a rotating master quote.
 // The quote changes every time the site is opened and every 15 minutes while it stays open.
-import { QUOTES, BOOKS, RATINGS_SOURCE, RATINGS_CHECKED } from './quotes.js';
+import { QUOTES } from './quotes.js';
 
 const QUOTE_KEY = 'opening-trainer.quote';   // { i, at }
 const STATE_KEY = 'opening-trainer.corner';  // 'open' | 'min'
@@ -28,27 +28,15 @@ export function initCorner() {
 
   const el = document.createElement('aside');
   el.className = 'corner';
-  el.setAttribute('aria-label', 'Chess quote and recommended reads');
+  el.setAttribute('aria-label', 'Chess quote');
   el.innerHTML = `
-    <button class="corner-fab" type="button" aria-label="Show quote and recommended reads" title="Quote &amp; reads">❝</button>
+    <button class="corner-fab" type="button" aria-label="Show quote" title="Quote">❝</button>
     <div class="corner-card card">
       <button class="corner-close" type="button" aria-label="Minimise" title="Minimise">–</button>
       <figure class="corner-quote">
         <blockquote></blockquote>
         <figcaption></figcaption>
       </figure>
-      <details class="corner-books">
-        <summary>📚 Recommended reads</summary>
-        <ul>
-          ${BOOKS.map((b) => `
-            <li>
-              <a href="${b.url}" target="_blank" rel="noopener">${esc(b.title)}</a>
-              <span class="corner-meta">${esc(b.author)} · <span class="corner-star">★ ${b.rating.toFixed(1)}</span></span>
-              <span class="corner-why">${esc(b.why)}</span>
-            </li>`).join('')}
-        </ul>
-        <p class="corner-src">Average ratings on ${RATINGS_SOURCE}, ${RATINGS_CHECKED}.</p>
-      </details>
     </div>`;
   document.body.insertBefore(el, document.querySelector('.footer'));
 

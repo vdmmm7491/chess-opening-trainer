@@ -287,6 +287,18 @@ export function recordPunish(openingId, idx, clean) {
 }
 export function punishStats(openingId) { return state.punish?.[openingId] || {}; }
 
+// ---- Starred openings (the ones you're learning) ----
+// Kept as { id: { on, t } } rather than a list, so unstarring on one device survives a cloud merge.
+export function isStarred(openingId) { return !!state.starred?.[openingId]?.on; }
+export function toggleStar(openingId) {
+  state.starred = state.starred || {};
+  const on = !isStarred(openingId);
+  state.starred[openingId] = { on, t: Date.now() };
+  save();
+  return on;
+}
+export function starredIds() { return Object.keys(state.starred || {}).filter(isStarred); }
+
 export function activityDays() { return state.days; }
 export function history() { return state.history; }
 
@@ -343,6 +355,7 @@ export function mergeStates(a, b) {
   })));
   // Settings: a fresh device takes the saved ones; otherwise this device's choices win.
   out.settings = hasProgress(a) ? { ...b.settings, ...a.settings } : { ...a.settings, ...b.settings };
-  for (const k of ['studied', 'quiz', 'punish']) if (!a[k] && !b[k]) delete out[k];
+  out.starred = mergeMaps(a.starred, b.starred, (x, y) => ((y.t || 0) > (x.t || 0) ? y : x));
+  for (const k of ['studied', 'quiz', 'punish', 'starred']) if (!a[k] && !b[k]) delete out[k];
   return out;
 }

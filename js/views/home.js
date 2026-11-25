@@ -1,5 +1,6 @@
 import { OPENINGS, LEVELS, TIERS, TIER_KEYS, tierForLevel, linesFor } from '../openings.js';
-import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK, practiceUnlocked } from '../progress.js';
+import { openingProgress, dueCount, summary, getLevel, setLevel, getSettings, setSetting, quizUnlocked, linesLearned, QUIZ_UNLOCK, practiceUnlocked, isStarred, toggleStar } from '../progress.js';
+import { suggestedIds, refreshSuggestions } from '../suggest.js';
 import { h, esc, progressBar } from '../ui.js';
 import { pieceUrl } from '../board.js';
 import { PUNISH } from '../punish.js';
@@ -9,6 +10,7 @@ import { matchOpening } from '../search.js';
 let sideFilter = 'all';
 let lastSide = 'w'; // the side the White/Black toggle shows while "All" is selected
 let query = ''; // opening search; while set, it searches every tier
+let starOnly = false; // the ★ Starred filter: starred openings from every tier
 
 function levelBadges(o) {
   return (o.levels || []).map((k) => {
@@ -69,6 +71,7 @@ export function render(root) {
 
   const filters = h(`<div class="filters">
     <button class="btn small" data-f="all">All</button>
+    <button class="btn small star-filter" data-f="star" aria-pressed="false" title="Only the openings you starred, from every tier">★ Starred</button>
     <button class="btn small side-toggle" data-f="side" title="Click to switch between White and Black"><span class="side-icon"></span><span class="side-name"></span><span class="side-swap" aria-hidden="true">⇄</span></button>
     <label class="search-box">
       <span class="search-icon" aria-hidden="true">🔍</span>
@@ -86,7 +89,10 @@ export function render(root) {
     levelBox.querySelector('.level-blurb').textContent = LEVELS[level].blurb;
     const side = sideFilter === 'all' ? lastSide : sideFilter;
     const toggle = filters.querySelector('.side-toggle');
-    filters.querySelector('[data-f="all"]').classList.toggle('active', sideFilter === 'all');
+    filters.querySelector('[data-f="all"]').classList.toggle('active', sideFilter === 'all' && !starOnly);
+    const sf = filters.querySelector('[data-f="star"]');
+    sf.classList.toggle('active', starOnly);
+    sf.setAttribute('aria-pressed', String(starOnly));
     toggle.classList.toggle('active', sideFilter !== 'all');
     toggle.classList.toggle('w', side === 'w');
     toggle.classList.toggle('b', side === 'b');
@@ -100,7 +106,7 @@ export function render(root) {
     tierBox.querySelectorAll('.tier-label').forEach((b) => b.classList.toggle('active', +b.dataset.i === ti));
     tierBox.querySelector('.tier-blurb').textContent = t.blurb;
     grid.style.setProperty('--tier', t.color);
-    tierBox.classList.toggle('searching', !!query.trim());
+    tierBox.classList.toggle('searching', !!query.trim() || starOnly);
 
     swapCards(animate);
   }
@@ -110,28 +116,35 @@ export function render(root) {
     const out = [];
     const searching = !!query.trim();
     const found = new Map();
+    const suggested = suggestedIds();
     const list = OPENINGS.filter((o) => {
       if (sideFilter !== 'all' && o.side !== sideFilter) return false;
-      if (!searching) return o.tier === tier;
+      if (starOnly && !isStarred(o.id)) return false;
+      if (!searching) return starOnly || o.tier === tier;
       const m = matchOpening(o, query);
       if (m) found.set(o.id, m);
       return !!m;
-    });
+    }).sort((a, b) => isStarred(b.id) - isStarred(a.id) || !!suggested[b.id] - !!suggested[a.id]); // stable: book order otherwise
     if (!list.length) {
       out.push(h(searching
-        ? `<p class="muted">No openings match “${esc(query.trim())}”${sideFilter === 'all' ? '' : ' for this side'}.</p>`
+        ? `<p class="muted">No ${starOnly ? 'starred ' : ''}openings match “${esc(query.trim())}”${sideFilter === 'all' ? '' : ' for this side'}.</p>`
+        : starOnly ? `<p class="muted">No starred openings${sideFilter === 'all' ? '' : ' for this side'} yet. Tap the ☆ on an opening you are learning to keep it here.</p>`
         : '<p class="muted">No openings for this side in this tier yet.</p>'));
     }
     for (const o of list) {
       const m = found.get(o.id);
-      const tierTag = searching && TIERS[o.tier] ? `<span class="tier-tag" style="--tier:${TIERS[o.tier].color}">${esc(TIERS[o.tier].name)}</span>` : '';
+      const star = isStarred(o.id);
+      const why = suggested[o.id];
+      const tierTag = (searching || starOnly) && TIERS[o.tier] ? `<span class="tier-tag" style="--tier:${TIERS[o.tier].color}">${esc(TIERS[o.tier].name)}</span>` : '';
       const lineHits = m?.lines.length ? `<p class="line-hits">Lines: ${m.lines.slice(0, 4).map(esc).join(' · ')}${m.lines.length > 4 ? ` +${m.lines.length - 4} more` : ''}</p>` : '';
       const p = openingProgress(o);
       const due = dueCount(o);
       const n = linesFor(o, level).length;
       out.push(h(`<article class="card opening-card" style="--tier:${TIERS[o.tier]?.color || 'var(--border)'}">
         <div class="title"><div class="title-left"><span class="thumb ${o.side}" style="background-image:url(${pieceUrl(o.side, 'n')})"></span>
-          <h3>${esc(o.name)}</h3></div><span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span></div>
+          <h3>${esc(o.name)}</h3></div>
+          <div class="title-right">${why ? `<span class="sugg-pill" title="${esc(why)}">Suggested</span>` : ''}<span class="tag ${o.side}">${o.side === 'w' ? 'White' : 'Black'}</span>
+          <button class="star-btn${star ? ' on' : ''}" type="button" data-star="${o.id}" aria-pressed="${star}" aria-label="${star ? 'Unstar' : 'Star'} ${esc(o.name)}" title="${star ? 'Starred: you are learning this. Tap to unstar' : 'Star this opening to keep it at the top'}">${star ? '★' : '☆'}</button></div></div>
         <div class="lvl-row">${tierTag}${levelBadges(o)}</div>
         <p>${esc(o.description)}</p>
         ${lineHits}
@@ -223,14 +236,30 @@ export function render(root) {
   search.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && search.value) { e.stopPropagation(); search.value = query = ''; draw(); }
   });
+  grid.addEventListener('click', (e) => {
+    const b = e.target.closest('.star-btn');
+    if (!b) return;
+    const on = toggleStar(b.dataset.star);
+    const name = b.closest('.opening-card').querySelector('h3').textContent;
+    if (starOnly && !on) { draw(true); return; }
+    b.classList.toggle('on', on);
+    b.textContent = on ? '★' : '☆';
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', `${on ? 'Unstar' : 'Star'} ${name}`);
+    b.title = on ? 'Starred: you are learning this. Tap to unstar' : 'Star this opening to keep it at the top';
+    if (on && animationsOn()) b.animate([{ transform: 'scale(1.5)' }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+  });
   filters.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.f === 'all') sideFilter = 'all';
+    if (b.dataset.f === 'star') { starOnly = !starOnly; draw(true); return; }
+    if (b.dataset.f === 'all') { sideFilter = 'all'; starOnly = false; }
     // First click picks the side it shows; after that each click swaps White <-> Black.
     else sideFilter = lastSide = sideFilter === 'all' ? lastSide : (sideFilter === 'w' ? 'b' : 'w');
     draw(true);
   });
   draw();
-  return () => clearTimeout(searchTimer);
+  let alive = true;
+  refreshSuggestions().then((changed) => { if (changed && alive) draw(); });
+  return () => { alive = false; clearTimeout(searchTimer); };
 }

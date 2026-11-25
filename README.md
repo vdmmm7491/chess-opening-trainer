@@ -90,6 +90,8 @@ The **Profile** tab shows your streak, an activity calendar and how well you kno
 
 ### Also
 
+- **Star your openings:** tap ☆ on the openings you're learning; they come first, and ★ Starred lists them together. A **Suggested** tag marks openings picked from your Chess.com games.
+- **Sync between devices:** optional sign-in with an emailed link (no password) keeps your progress in step on your phone and computer.
 - **Play on:** when a book line ends, keep playing the position against Stockfish.
 - **Draw on the board:** right-click and drag for arrows, right-click a square to highlight it.
 - **Settings (⚙):** 5 piece sets, 7 board colours, dark or light theme, animations on/off.
