@@ -48,34 +48,55 @@ function friendly(err) {
   return m;
 }
 
+/**
+ * The sign-in link's result in this address, wherever Supabase put it: `?code=` (PKCE), or inside
+ * the hash, either after our route (`#/?code=`, when the redirect URL already had a hash) or as
+ * the whole hash (`#access_token=…` or `#error=…`), which the router would otherwise read as a page.
+ */
+function linkParams() {
+  const out = new URLSearchParams(location.search);
+  const hash = location.hash.replace(/^#/, '');
+  const inHash = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : /^[a-z_]+=/.test(hash) ? hash : '';
+  for (const [k, v] of new URLSearchParams(inHash)) if (!out.has(k)) out.set(k, v);
+  const p = {
+    code: out.get('code'),
+    access: out.get('access_token'),
+    refresh: out.get('refresh_token'),
+    error: out.get('error_description') || out.get('error_code') || (out.has('error') ? out.get('error') : ''),
+  };
+  return p.code || (p.access && p.refresh) || p.error ? p : null;
+}
+
 /** Start sync on page load: finish a sign-in link, or resume a saved session. */
 export async function initCloud() {
-  const query = new URLSearchParams(location.search);
-  const hashErr = /^#error=/.test(location.hash) ? new URLSearchParams(location.hash.slice(1)) : null;
-  const code = query.get('code');
-  const linkErr = query.get('error_description') || hashErr?.get('error_description');
-  if (code || linkErr) {
-    // Drop the sign-in parameters from the address and land on the Progress page.
+  const link = linkParams();
+  if (link) {
+    // Drop the sign-in parameters from the address and land on the Profile page.
     history.replaceState(null, '', location.pathname + '#/progress');
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   }
-  if (linkErr) { setStatus({ state: 'signed-out', error: friendly(linkErr) }); return; }
-  if (!code && !hasStoredSession()) return;
+  const done = () => { if (link) window.dispatchEvent(new CustomEvent('cloud-link-done')); };
+  if (link?.error) { setStatus({ state: 'signed-out', error: friendly(link.error.replace(/\+/g, ' ')) }); done(); return; }
+  if (!link && !hasStoredSession()) return;
 
   setStatus({ state: 'loading', error: '' });
   try {
     const sb = await client();
-    if (code) {
-      const { error } = await sb.auth.exchangeCodeForSession(code);
+    if (link?.code) {
+      const { error } = await sb.auth.exchangeCodeForSession(link.code);
+      if (error) throw error;
+    } else if (link) {
+      const { error } = await sb.auth.setSession({ access_token: link.access, refresh_token: link.refresh });
       if (error) throw error;
     }
     const { data: { session } } = await sb.auth.getSession();
     watchAuth(sb);
     if (session) await signedIn(session.user);
-    else setStatus({ state: 'signed-out' });
+    else setStatus({ state: 'signed-out', error: link ? 'Signing in did not finish. Ask for a new link and open it in this browser.' : '' });
   } catch (err) {
     setStatus({ state: user ? 'error' : 'signed-out', error: friendly(err) });
   }
+  done();
 }
 
 let watching = false;

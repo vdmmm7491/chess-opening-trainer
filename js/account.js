@@ -90,6 +90,8 @@ export function initAccountButton(btn) {
   };
   window.addEventListener('cloud-status', draw);
   btn.addEventListener('click', openAccount);
+  // Back from a sign-in link: show how it went (signed in, or why not).
+  window.addEventListener('cloud-link-done', () => { if (!document.querySelector('dialog.account-dialog')) openAccount(); });
   draw();
 }
 
