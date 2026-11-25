@@ -15,6 +15,8 @@
   --good: #34b37e;
   --warn: #e9b13b;
   --bad: #ef5350;
+  --signin: #8b5cf6;          /* violet: the Sign in button, apart from the blue accent */
+  --signin-hover: #a07bff;
   --light-sq: #dde3ea;
   --dark-sq: #6f84a0;
   --hl: rgba(255, 196, 61, 0.42);
@@ -40,6 +42,8 @@
   --good: #1f8f5f;
   --warn: #a86b00;
   --bad: #d32f2f;
+  --signin: #7c3aed;
+  --signin-hover: #8b5cf6;
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   color-scheme: light;
 }
@@ -66,6 +70,29 @@ button, input, select { font: inherit; color: inherit; }
 }
 .nav a.active { color: var(--text); background: var(--panel-2); }
 .nav a:hover, .nav button.icon:hover { color: var(--text); background: var(--panel-hover); }
+
+/* Account: violet "Sign in" pill, then a round avatar with a sync dot once signed in */
+.account-btn {
+  margin-left: 4px; padding: 7px 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--signin); color: #fff; font-size: 0.9rem; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--signin) 40%, transparent); transition: background 0.15s;
+}
+.account-btn:hover { background: var(--signin-hover); }
+.account-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.account-btn.signed-in {
+  position: relative; width: 36px; height: 36px; padding: 0; box-shadow: none;
+  background: var(--panel-2); border: 2px solid var(--signin);
+}
+.account-btn.signed-in:hover { background: var(--panel-hover); }
+.account-btn .avatar { display: flex; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; color: var(--muted); }
+.account-btn .avatar svg { width: 100%; height: 100%; }
+.account-btn .sync-dot {
+  position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--good); border: 2px solid var(--bg-2);
+}
+.account-btn[data-sync="syncing"] .sync-dot, .account-btn[data-sync="loading"] .sync-dot { background: var(--warn); }
+.account-btn[data-sync="error"] .sync-dot { background: var(--bad); }
+dialog.account-dialog .cloud-form { margin-top: 8px; }
 
 .app { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 18px 16px; }
 .footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 16px; }
@@ -512,6 +539,9 @@ dialog.settings label { display: flex; flex-direction: column; gap: 6px; margin-
   .nav { justify-content: space-between; }
   .nav { overflow-x: auto; scrollbar-width: none; }
   .nav a { padding: 6px 5px; font-size: 0.82rem; flex: 1; text-align: center; white-space: nowrap; }
+  /* The nav scrolls sideways here, so the account button sits in the top-right corner beside the logo */
+  .account-btn { position: absolute; top: max(8px, env(safe-area-inset-top)); right: 10px; margin: 0; padding: 6px 12px; font-size: 0.82rem; }
+  .account-btn.signed-in { position: absolute; width: 32px; height: 32px; }
   .evalbar { width: 14px; }
   .evalbar .label { font-size: 8px; }
   h1 { font-size: 1.25rem; }

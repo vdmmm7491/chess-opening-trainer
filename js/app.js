@@ -11,11 +11,13 @@ import { applyTheme, openSettings } from './theme.js';
 import { initCorner } from './corner.js';
 import { initTutorial } from './tutorial.js';
 import { initCloud } from './cloud.js';
+import { initAccountButton } from './account.js';
 
 applyTheme();
 initCorner();
 initTutorial();
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
+initAccountButton(document.getElementById('accountBtn'));
 
 const app = document.getElementById('app');
 let cleanup = null;

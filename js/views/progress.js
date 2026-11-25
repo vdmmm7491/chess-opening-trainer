@@ -3,7 +3,8 @@ import { summary, openingProgress, lineProgress, lineStats, activityDays, histor
 import { h, esc, progressBar } from '../ui.js';
 import { loadGames } from '../chesscom.js';
 import { recommend, levelName, prettyFamily } from '../recommend.js';
-import { cloudStatus, sendLink, signOut, sync, pushReplace } from '../cloud.js';
+import { cloudStatus, pushReplace } from '../cloud.js';
+import { cloudPanel } from '../account.js';
 
 export function render(root) {
   let alive = true;
@@ -68,7 +69,9 @@ export function render(root) {
     ${hist ? `<div class="table-wrap"><table><tbody>${hist}</tbody></table></div>` : '<p class="muted">No sessions yet – go practise an opening!</p>'}</div>`));
 
   // Cloud sync (optional sign-in)
-  const offCloud = cloudSection(root);
+  const cloudCard = h(`<div class="card cloud-card" id="sync" style="margin-top:12px"><h2 style="margin-top:0">Sync between devices</h2></div>`);
+  root.appendChild(cloudCard);
+  const offCloud = cloudPanel(cloudCard);
 
   // Backup / sync between devices
   const backup = h(`<div class="card backup-card" style="margin-top:12px"><h2 style="margin-top:0">Backup &amp; move between devices</h2>
@@ -105,67 +108,6 @@ export function render(root) {
     catch (err) { alert('Import failed: ' + err.message); }
   });
   return () => { alive = false; offCloud(); };
-}
-
-// ---- Cloud sync card: sign in with an emailed link, then progress syncs on its own
-function ago(t) {
-  const s = Math.round((Date.now() - t) / 1000);
-  return s < 10 ? 'just now' : s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : new Date(t).toLocaleString();
-}
-
-function cloudSection(root) {
-  const card = h(`<div class="card cloud-card" style="margin-top:12px"><h2 style="margin-top:0">Sync between devices</h2><div class="cloud-body"></div></div>`);
-  root.appendChild(card);
-  const body = card.querySelector('.cloud-body');
-  let sent = '';
-
-  function draw() {
-    const st = cloudStatus();
-    const err = st.error ? `<p class="bad" role="alert">${esc(st.error)}</p>` : '';
-    if (st.email && st.state !== 'signed-out') {
-      const line = st.state === 'syncing' || st.state === 'loading' ? 'Syncing…'
-        : st.state === 'error' ? 'Sync failed, your progress is still saved on this device.'
-        : `Synced ${ago(st.lastSync)}.`;
-      body.innerHTML = `<p style="margin-top:0">Signed in as <b>${esc(st.email)}</b>. ${esc(line)}</p>${err}
-        <div class="btn-row"><button class="btn small" data-act="sync">↻ Sync now</button>
-        <button class="btn small" data-act="signout">Sign out</button></div>
-        <p class="muted" style="margin-bottom:0">Progress uploads a few seconds after each line or quiz. Signing out keeps it on this device.</p>`;
-    } else if (st.state === 'loading') {
-      body.innerHTML = '<p class="muted" style="margin:0">Signing in…</p>';
-    } else {
-      body.innerHTML = `<p class="muted" style="margin-top:0">Optional: sign in with your email to keep progress in sync on your phone and computer. We email you a link, no password needed. Progress already on this device is kept and merged.</p>
-        ${err}
-        <form class="form-row cloud-form">
-          <input class="input" type="email" required placeholder="you@example.com" autocomplete="email" style="flex:1;min-width:180px" />
-          <button class="btn primary" type="submit">Email me a sign-in link</button>
-        </form>
-        ${sent ? `<p class="good">Link sent to <b>${esc(sent)}</b>. Open it in this browser to finish signing in.</p>` : ''}`;
-    }
-  }
-
-  body.addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-act]');
-    if (!b) return;
-    b.disabled = true;
-    if (b.dataset.act === 'sync') await sync();
-    if (b.dataset.act === 'signout') { sent = ''; await signOut().catch(() => {}); }
-    draw();
-  });
-  body.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = body.querySelector('input[type=email]');
-    const btn = body.querySelector('button[type=submit]');
-    const email = input.value.trim();
-    btn.disabled = true; btn.textContent = 'Sending…';
-    try { await sendLink(email); sent = email; draw(); }
-    catch (err) { sent = ''; draw(); body.querySelector('input[type=email]').value = email; body.insertAdjacentHTML('afterbegin', `<p class="bad" role="alert">${esc(err.message)}</p>`); }
-  });
-
-  const onStatus = () => draw();
-  window.addEventListener('cloud-status', onStatus);
-  const tick = setInterval(() => { if (cloudStatus().state === 'synced' && !body.contains(document.activeElement)) draw(); }, 30000);
-  draw();
-  return () => { window.removeEventListener('cloud-status', onStatus); clearInterval(tick); };
 }
 
 // ---- What to learn next: the openings that beat you on Chess.com, and what counters them
