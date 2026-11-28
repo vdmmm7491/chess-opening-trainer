@@ -1,9 +1,9 @@
 // Account: the Sign in / avatar button in the top bar, and the sign-in panel it shares with the
 // Profile page ("Sync between devices"). The sync itself lives in cloud.js.
-import { cloudStatus, sendLink, signOut, sync } from './cloud.js';
+import { cloudStatus, sendLink, signInPassword, signUp, resetPassword, setPassword, endRecovery, signOut, sync } from './cloud.js';
 import { esc } from './ui.js';
 
-// ---- Cloud sync card: sign in with an emailed link, then progress syncs on its own
+// ---- Cloud sync card: sign in with email + password (or an emailed link), then progress syncs on its own
 function ago(t) {
   const s = Math.round((Date.now() - t) / 1000);
   return s < 10 ? 'just now' : s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : new Date(t).toLocaleString();
@@ -14,48 +14,110 @@ export function cloudPanel(container) {
   const body = document.createElement('div');
   body.className = 'cloud-body';
   container.appendChild(body);
-  let sent = '';
+  let mode = 'password'; // signed out: 'password' | 'link' | 'forgot'
+  let note = '';         // success message under the form
+  let pwForm = false;    // signed in: the "Set password" form is open
 
-  function draw() {
+  const emailInput = (v = '') => `<input class="input" type="email" name="email" required placeholder="you@example.com" autocomplete="email" value="${esc(v)}" style="flex:1;min-width:180px" />`;
+  const pwInput = (name, auto, ph) => `<input class="input" type="password" name="${name}" required minlength="6" placeholder="${ph}" autocomplete="${auto}" style="flex:1;min-width:180px" />`;
+  const link = (act, text) => `<button type="button" class="btn small" data-act="${act}">${text}</button>`;
+
+  function draw(email = body.querySelector('input[name=email]')?.value || '') {
     const st = cloudStatus();
     const err = st.error ? `<p class="bad" role="alert">${esc(st.error)}</p>` : '';
+    const ok = note ? `<p class="good">${note}</p>` : '';
     if (st.email && st.state !== 'signed-out') {
       const line = st.state === 'syncing' || st.state === 'loading' ? 'Syncing…'
         : st.state === 'error' ? 'Sync failed, your progress is still saved on this device.'
         : `Synced ${ago(st.lastSync)}.`;
+      const setPw = st.recovery || pwForm;
       body.innerHTML = `<p style="margin-top:0">Signed in as <b>${esc(st.email)}</b>. ${esc(line)}</p>${err}
+        ${setPw ? `<p style="margin-bottom:4px">${st.recovery ? '<b>Choose a new password</b> to sign in with from now on.' : 'Set a password to sign in with on your other devices.'}</p>
+        <form class="form-row cloud-form" data-form="setpw">
+          ${pwInput('password', 'new-password', 'New password (6+ characters)')}
+          <button class="btn primary" type="submit">Save password</button>
+          ${link('cancelpw', 'Not now')}
+        </form>` : ''}
+        ${ok}
         <div class="btn-row"><button class="btn small" data-act="sync">↻ Sync now</button>
+        ${setPw ? '' : link('openpw', 'Set password')}
         <button class="btn small" data-act="signout">Sign out</button></div>
         <p class="muted" style="margin-bottom:0">Progress uploads a few seconds after each line or quiz. Signing out keeps it on this device.</p>`;
     } else if (st.state === 'loading') {
       body.innerHTML = '<p class="muted" style="margin:0">Signing in…</p>';
     } else {
-      body.innerHTML = `<p class="muted" style="margin-top:0">Optional: sign in with your email to keep progress in sync on your phone and computer. We email you a link, no password needed. Progress already on this device is kept and merged.</p>
-        ${err}
-        <form class="form-row cloud-form">
-          <input class="input" type="email" required placeholder="you@example.com" autocomplete="email" style="flex:1;min-width:180px" />
-          <button class="btn primary" type="submit">Email me a sign-in link</button>
-        </form>
-        ${sent ? `<p class="good">Link sent to <b>${esc(sent)}</b>. Open it in this browser to finish signing in.</p>` : ''}`;
+      const intro = '<p class="muted" style="margin-top:0">Optional: sign in to keep progress in sync on your phone and computer. Progress already on this device is kept and merged.</p>';
+      if (mode === 'password') {
+        body.innerHTML = `${intro}${err}
+          <form class="cloud-form" data-form="password" style="display:grid;gap:8px">
+            ${emailInput(email)}
+            ${pwInput('password', 'current-password', 'Password')}
+            <div class="btn-row" style="margin:0">
+              <button class="btn primary" type="submit" data-go="signin">Sign in</button>
+              <button class="btn" type="submit" data-go="signup">Create account</button>
+            </div>
+          </form>${ok}
+          <div class="btn-row">${link('forgot', 'Forgot password?')}${link('link', 'Email me a sign-in link instead')}</div>`;
+      } else {
+        const forgot = mode === 'forgot';
+        body.innerHTML = `${intro}
+          <p style="margin-bottom:4px">${forgot
+            ? 'We\'ll email you a link. Open it (on any device) to sign in and choose a password. This also works if you never had one.'
+            : 'We\'ll email you a link that signs you in, no password needed. Open it on any device.'}</p>
+          ${err}
+          <form class="form-row cloud-form" data-form="${mode}">
+            ${emailInput(email)}
+            <button class="btn primary" type="submit">${forgot ? 'Email me a reset link' : 'Email me a sign-in link'}</button>
+          </form>${ok}
+          <div class="btn-row">${link('password', '← Sign in with password')}</div>`;
+      }
     }
   }
+
+  const fail = (err, email) => { note = ''; draw(email); body.insertAdjacentHTML('afterbegin', `<p class="bad" role="alert">${esc(err.message)}</p>`); };
 
   body.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-act]');
     if (!b) return;
+    const act = b.dataset.act;
+    if (['password', 'link', 'forgot'].includes(act)) { mode = act; note = ''; draw(); body.querySelector('input')?.focus(); return; }
+    if (act === 'openpw') { pwForm = true; note = ''; draw(); body.querySelector('input[name=password]')?.focus(); return; }
+    if (act === 'cancelpw') { pwForm = false; endRecovery(); draw(); return; }
     b.disabled = true;
-    if (b.dataset.act === 'sync') await sync();
-    if (b.dataset.act === 'signout') { sent = ''; await signOut().catch(() => {}); }
+    if (act === 'sync') await sync();
+    if (act === 'signout') { note = ''; pwForm = false; mode = 'password'; await signOut().catch(() => {}); }
     draw();
   });
+
   body.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const input = body.querySelector('input[type=email]');
-    const btn = body.querySelector('button[type=submit]');
-    const email = input.value.trim();
-    btn.disabled = true; btn.textContent = 'Sending…';
-    try { await sendLink(email); sent = email; draw(); }
-    catch (err) { sent = ''; draw(); body.querySelector('input[type=email]').value = email; body.insertAdjacentHTML('afterbegin', `<p class="bad" role="alert">${esc(err.message)}</p>`); }
+    const form = e.target;
+    const kind = form.dataset.form;
+    const go = e.submitter?.dataset.go || 'signin';
+    const email = form.querySelector('input[name=email]')?.value.trim() || '';
+    const password = form.querySelector('input[name=password]')?.value || '';
+    form.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+    const btn = e.submitter || form.querySelector('button[type=submit]');
+    btn.textContent = 'Please wait…';
+    try {
+      if (kind === 'setpw') {
+        await setPassword(password);
+        pwForm = false; note = 'Password saved. You can now sign in with it on any device.';
+      } else if (kind === 'password' && go === 'signup') {
+        const r = await signUp(email, password);
+        note = r === 'confirm' ? `Almost done: we sent a confirmation link to <b>${esc(email)}</b>. Open it (any device works), then sign in here with your password.` : '';
+      } else if (kind === 'password') {
+        await signInPassword(email, password);
+        note = '';
+      } else if (kind === 'forgot') {
+        await resetPassword(email);
+        note = `Reset link sent to <b>${esc(email)}</b>. Open it to sign in and choose a password.`;
+      } else {
+        await sendLink(email);
+        note = `Link sent to <b>${esc(email)}</b>. Open it on any device to sign in.`;
+      }
+      draw(email);
+    } catch (err) { fail(err, email); }
   });
 
   const onStatus = () => draw();
@@ -106,5 +168,5 @@ function openAccount() {
   dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // backdrop
   dlg.addEventListener('close', () => { off(); dlg.remove(); });
   dlg.showModal();
-  dlg.querySelector('input[type=email]')?.focus();
+  (dlg.querySelector('[data-form=setpw] input') || dlg.querySelector('input[type=email]'))?.focus();
 }

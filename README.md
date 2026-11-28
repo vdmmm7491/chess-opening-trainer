@@ -28,7 +28,7 @@ Free, open source, runs in your browser. No account needed, no install, no ads.
 
 After that, try **⚔️ Punish** (common opponent mistakes and how to punish them) and the **Quiz**, or add your Chess.com username on the **Review** tab.
 
-> Your progress lives in this browser (localStorage). Clearing site data erases it. To use it on another device, sign in under **Sync between devices** on the **Progress** page (optional, emailed link, no password), or use export/import there.
+> Your progress lives in this browser (localStorage). Clearing site data erases it. To use it on another device, sign in under **Sync between devices** on the **Progress** page (optional: email and password, or an emailed link), or use export/import there.
 
 ---
 

@@ -253,7 +253,7 @@ export function startTour() {
   show(0);
 }
 
-export function initTutorial() {
+export function initTutorial({ auto = true } = {}) {
   const btn = document.createElement('button');
   btn.className = 'tutorial-fab';
   btn.type = 'button';
@@ -263,5 +263,5 @@ export function initTutorial() {
   btn.addEventListener('click', startTour);
   document.body.insertBefore(btn, document.querySelector('.footer'));
 
-  if (!read(SEEN_KEY)) setTimeout(startTour, 600);
+  if (auto && !read(SEEN_KEY)) setTimeout(startTour, 600);
 }

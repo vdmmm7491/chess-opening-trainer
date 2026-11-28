@@ -10,12 +10,13 @@ import * as punish from './views/punish.js';
 import { applyTheme, openSettings } from './theme.js';
 import { initCorner } from './corner.js';
 import { initTutorial } from './tutorial.js';
-import { initCloud } from './cloud.js';
+import { initCloud, arrivedFromLink } from './cloud.js';
 import { initAccountButton } from './account.js';
 
 applyTheme();
 initCorner();
-initTutorial();
+// No auto tour when arriving from a sign-in email: it would jump to Home over the sign-in dialog.
+initTutorial({ auto: !arrivedFromLink() });
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
 initAccountButton(document.getElementById('accountBtn'));
 
